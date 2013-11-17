@@ -1,0 +1,154 @@
+<link rel="stylesheet" type="text/css" href="style.css">
+<script src="../jquery-1.9.1.min.js"></script>
+<script src=three.min.js></script>
+<script src="/socket.io/socket.io.js"></script>
+<script src="../seedrandom.js"></script>
+<script>
+window.actions = [];
+</script>
+<script src="scripts/mapRoom.js"></script>
+<script src="scripts/chat.js"></script>
+<script src="scripts/gameRoom.js"></script>
+<script src="scripts/fight.js"></script>
+<body><div id=gameDiv></div></body>
+<script>
+$(function()
+{
+	window.startServer = function()
+	{
+		window.socket = io.connect('ws://'+window.location.host);
+		window.socket.on('started', function(e)
+		{
+			window.playerId = e.id;
+			console.log(window.playerId);
+			connectedToServer();
+		});
+		window.socket.on('friendConnected', function(e)
+		{
+			friendConnected();
+		});
+		window.socket.on('update', function(e)
+		{
+			doAction(e);
+		});
+		window.socket.on('disconnect', function(e)
+		{
+			doAction({type:'disconnect', playerId:e.socketId});
+		});
+	}
+	window.startClient = function()
+	{
+		window.socket = io.connect('ws://'+window.location.host);
+		window.gameId = window.location.hash.substring(1);
+		window.location.hash = "";
+		window.socket.emit('gameConnect', {id:window.gameId});
+		window.socket.on('started', function(e)
+		{
+			window.playerId = e.id;
+			console.log(window.playerId);
+			connectedToServer();
+		});
+		window.socket.on('update', function(e)
+		{
+			doAction(e);
+		});
+		window.socket.on('disconnect', function(e)
+		{
+			if (e.socketId == window.gameId)
+				addToChat('host disconnected weird stuff will probably happen in game');
+			doAction({type:'disconnect', playerId:e.socketId});
+		});
+	}
+	window.gameElement = $('div#gameDiv');
+	window.gameElement.append('<div id=ui></div>');
+	window.scene = new THREE.Scene();
+	window.WIDTH = 600;
+	window.HEIGHT = 400;
+	window.renderer = new THREE.WebGLRenderer({antialias:true});
+    renderer.setSize(WIDTH, HEIGHT);
+    window.gameElement.append(renderer.domElement);
+	window.camera = new THREE.PerspectiveCamera(45, WIDTH / HEIGHT, 0.1, 20000);
+    camera.position.set(0,6,4);
+    camera.lookAt(new THREE.Vector3( 0, 0, 0 ));
+    scene.add(camera);
+	window.morphs = [];
+	window.clock = new THREE.Clock();
+	window.loader = new THREE.JSONLoader();
+	window.projector = new THREE.Projector();
+	window.destroyScene = function()
+	{
+		var obj, i;
+		for ( i = scene.children.length - 1; i >= 0 ; i -- ) {
+			obj = scene.children[ i ];
+			if ( obj !== plane && obj !== camera) {
+				scene.remove(obj);
+			}
+		}
+	}
+	window.animations = [];
+	window.renderFunct = function()
+	{
+		requestAnimationFrame(window.renderFunct);
+		var delta = clock.getDelta();
+		for ( var i = 0; i < morphs.length; i ++ ) {
+			morph = morphs[ i ];
+			if (morph.time > 2500)
+				morph.time = 0
+			morph.updateAnimation( 1000 * delta );
+		}
+		for (var i = window.animations.length-1; i >= 0; --i)
+		{
+			window.animations[i].update(delta);
+		}
+		renderer.render( scene, camera );
+	}
+	window.doAction = function(action, send, unLocal)
+	{
+		if (!unLocal)
+		{
+			for (var i in actions)
+			{
+				if (action.type == actions[i].type)
+				{
+					actions[i].funct(action);
+				}
+			}
+		}
+		if (send)
+			window.socket.emit('update', action);
+	}
+	requestAnimationFrame(window.renderFunct);
+	window.connectedToServer = function(){}
+	if (window.location.hash == "" || window.location.hash == "#")
+	{
+		window.connectedToServer = function()
+		{
+			window.gameId = window.playerId;
+			console.log(window.location.href+'#'+window.playerId);
+			openChat();
+			window.gotoGameRoom();
+			doAction({type:"joinedGameRoom", playerId:window.playerId}, true);
+			//doAction({type:"makeHand", playerId:window.playerId});
+		}
+		window.friendConnected = function()
+		{
+			doAction({type:"gotoGameRoom"}, true, true);
+			for (var i in window.players)
+			{
+				doAction({type:"joinedGameRoom", playerId:window.players[i].playerId}, true, true);
+			}
+			//doAction({type:"makeHand", playerId:window.playerId}, true, true);
+		}
+		window.startServer();
+	}else
+	{
+		window.connectedToServer = function()
+		{
+			//doAction({type:"makeHand", playerId:window.playerId}, true);
+			doAction({type:"joinedGameRoom", playerId:window.playerId}, true);
+			openChat();
+		}
+		window.startClient();
+	}
+})
+</script>

@@ -1,0 +1,26 @@
+button.nav
+{
+	background-color:#ffaaaa;
+	border-radius:25px;
+	border:none;
+	cursor:pointer;
+}
+button.pirate
+{
+	background-color:#ffaaaa;
+	border-radius:25px;
+	border:none;
+	cursor:pointer;
+}
+div.dialogue
+{
+	color:ffaaaa;
+}
+canvas
+{
+	/*cursor: none;*/
+}
+button:focus
+{
+	outline: 0;
+}

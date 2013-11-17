@@ -1,0 +1,1741 @@
+<style>
+body
+{
+	margin: 0;
+}
+div#gui
+{
+	position: relative;
+	background-color:#000000;
+	height:340;
+	width:700;
+	text-align: center;
+}
+div.top
+{
+	color:#aa0000;
+	position: relative;
+	background-color:#000000;
+	height:40;
+	top: 0;
+}
+div.server
+{
+	color:#aa0000;
+	background-color:#0099ff;
+	font-weight:bold;
+	font-family:"courier";
+	position: absolute;
+	left:0;
+	bottom:0;
+	-moz-user-select: none; 
+	-khtml-user-select: none; 
+	-webkit-user-select: none; 
+	-o-user-select: none;
+	cursor:pointer;
+}
+div.tutorial
+{
+	color:#0099ff;
+	background-color:#aa0000;
+	font-weight:bold;
+	font-family:"courier";
+	position: absolute;
+	top:0;
+	left:0;
+	-moz-user-select: none; 
+	-khtml-user-select: none; 
+	-webkit-user-select: none; 
+	-o-user-select: none;
+	cursor:pointer;
+}
+div.weapons
+{
+	font-weight:bold;
+	font-family:"courier";
+	position: absolute;
+	top:45%;
+	right:0;
+	-moz-user-select: none; 
+	-khtml-user-select: none; 
+	-webkit-user-select: none; 
+	-o-user-select: none;
+	cursor:default;
+}
+div.popup
+{
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	margin-top: -50px;
+	margin-left: -100px;
+	height:100;
+	width:200;
+	background-color:#ff8888;
+}
+div.bigText
+{
+	position: absolute;
+	text-align: center;
+	bottom:0;
+	left:50%;
+	font-family:"courier";
+	font-weight:bold;
+	font-size:50;
+}
+div.popupBackground
+{
+	position: absolute;
+	top: 0;
+	left: 0;
+	height:340;
+	width:700;
+	background-color:#996666;
+	opacity:.3;
+}
+</style>
+<body>
+<div id=gui>
+<div class=top>
+</div>
+<canvas id=container height=300 width=500></canvas>
+<div class=server>
+</div>
+<div class=tutorial>
+</div>
+<div class=weapons>
+</div>
+</div>
+</body>
+<script src=jquery-1.9.1.min.js></script>
+<script src="/socket.io/socket.io.js"></script>
+<script src=seedrandom.js></script>
+<script>
+$(function()
+{
+	window.levelIterations = 0;
+	window.keysDown = {};
+	window.fps = 40;
+	window.stats = {};
+	window.stats.gameHeight = 300;
+	window.stats.gameWidth = 500;
+	window.stats.guySpeed = 3*window.fps/30;
+	window.stats.gooSpeed = 1*window.fps/30;
+	window.stats.enemySpeed = 1.5*window.fps/30;
+	window.objects = [];
+	window.objectspeed = 6*window.fps/30;
+	window.dir = 0;
+	window.gunCooldownMax = 20;
+	window.gunCooldown = window.gunCooldownMax;
+	window.makeTrapper = function(data)
+	{
+		var trapper = {};
+		trapper.z = 0;
+		trapper.x = 0;
+		trapper.y = 0;
+		trapper.placeCooldownMax = 20;
+		trapper.placeCooldown = trapper.placeCooldownMax;
+		trapper.placeGooCooldownMax = 20;
+		trapper.placeGooCooldown = trapper.placeGooCooldownMax;
+		trapper.checkType = function(type)
+		{
+			if (type == 'trapper')
+				return true;
+			return false;
+		}
+		trapper.go = function(data)
+		{
+			if (this.placeCooldown > 0)
+			{
+				this.placeCooldown--;
+				$('div#robot').css('opacity', (1-trapper.placeCooldown/trapper.placeCooldownMax));
+			}
+			if (this.placeGooCooldown > 0)
+			{
+				this.placeGooCooldown--;
+				$('div#goo').css('opacity', (1-trapper.placeGooCooldown/trapper.placeGooCooldownMax));
+			}
+		}
+		trapper.draw = function(data)
+		{
+			
+		}
+		trapper.tryFire = function()
+		{
+			if (this.placeCooldown == 0)
+			{
+				this.placeCooldown = this.placeCooldownMax;
+				return true;
+			}else
+				return false;
+		}
+		trapper.tryGoo = function()
+		{
+			if (this.placeGooCooldown == 0)
+			{
+				this.placeGooCooldown = this.placeGooCooldownMax;
+				return true;
+			}else
+				return false;
+		}
+		window.objects.push(trapper);
+		return trapper;
+	}
+	window.spawnGuy = function(data)
+	{
+		var guy = {};
+		guy.z = 5;
+		guy.x = data.x;
+		guy.y = data.y;
+		guy.nextX = data.x;
+		guy.nextY = data.y;
+		guy.dir = 0;
+		guy.width = 10;
+		guy.height = 10;
+		guy.jumpTimerMax = 10;
+		guy.jumpTimer = 0;
+		guy.jumpCooldownMax = 40;
+		guy.jumpCooldown = 0;
+		guy.movingDir = 0;
+		guy.checkType = function(type)
+		{
+			if (type == 'guy')
+				return true;
+			return false;
+		}
+		guy.sendsData = data.sendsData;
+		guy.go = function()
+		{
+			if (window.inGame)
+			{
+				this.rightObj = false;
+				this.leftObj = false;
+				this.upObj = false;
+				this.downObj = false;
+				this.sendData = false;
+				if (this.movingDir == 0 ||
+					this.movingDir == 1 && this.x >= this.nextX ||
+					this.movingDir == 3 && this.x <= this.nextX ||
+					this.movingDir == 4 && this.y >= this.nextY ||
+					this.movingDir == 2 && this.y <= this.nextY)
+				{
+					this.goo = false;
+					this.x = tilize(this.x);
+					this.y = tilize(this.y);
+					this.movingDir = 0;
+					var tryDown = true;
+					var tryUp = true;
+					var tryRight = true;
+					var tryLeft = true;
+					if (!window.isHost)// this is where the guy is controlled
+					{
+						if (window.keysDown.right)
+						{
+							if (!this.jumping)
+							{
+								this.rightObj = getRightHere({x:this.nextX+10, y:this.nextY, type:'table'});
+								this.goo = getRightHere({x:this.nextX+10, y:this.nextY, type:'goo'});
+							}
+							if (!this.rightObj && getRightHere({x:this.nextX+10, y:this.nextY, type:'space'}))
+							{
+								this.movingDir = 1;
+								this.nextX += 10;
+								this.sendData = true;
+							}
+						}else if (window.keysDown.left)
+						{
+							if (!this.jumping)
+							{
+								this.leftObj = getRightHere({x:this.nextX-10, y:this.nextY, type:'table'});
+								this.goo = getRightHere({x:this.nextX-10, y:this.nextY, type:'goo'});
+							}
+							if (!this.leftObj && getRightHere({x:this.nextX-10, y:this.nextY, type:'space'}))
+							{
+								this.movingDir = 3;
+								this.nextX -= 10;
+								this.sendData = true;
+							}
+						}else if (window.keysDown.down)
+						{
+							if (!this.jumping)
+							{
+								this.downObj = getRightHere({x:this.nextX, y:this.nextY+10, type:'table'});
+								this.goo = getRightHere({x:this.nextX, y:this.nextY+10, type:'goo'});
+							}
+							if (!this.downObj && getRightHere({x:this.nextX, y:this.nextY+10, type:'space'}))
+							{
+								this.movingDir = 4;
+								this.nextY += 10;
+								this.sendData = true;
+							}
+						}else if (window.keysDown.up)
+						{
+							if (!this.jumping)
+							{
+								this.upObj = getRightHere({x:this.nextX, y:this.nextY-10, type:'table'});
+								this.goo = getRightHere({x:this.nextX, y:this.nextY-10, type:'goo'});
+							}
+							if (!this.upObj && getRightHere({x:this.nextX, y:this.nextY-10, type:'space'}))
+							{
+								this.movingDir = 2;
+								this.nextY -= 10;
+								this.sendData = true;
+							}
+						}
+					}
+				}
+				if (this.movingDir == 1)
+				{
+					this.x += this.goo?window.stats.gooSpeed:window.stats.guySpeed;
+				}else
+				if (this.movingDir == 3)
+				{
+					this.x -= this.goo?window.stats.gooSpeed:window.stats.guySpeed;
+				}else
+				if (this.movingDir == 2)
+				{
+					this.y -= this.goo?window.stats.gooSpeed:window.stats.guySpeed;
+				}else
+				if (this.movingDir == 4)
+				{
+					this.y += this.goo?window.stats.gooSpeed:window.stats.guySpeed;
+				}
+				if (window.keysDown.action && !window.stickyAction)
+				{
+					window.stickyAction = true;
+					if (window.keysDown.down && this.downObj)
+					{
+						this.downObj.activate('down');
+					}else
+					if (window.keysDown.left && this.leftObj)
+					{
+						this.leftObj.activate('left');
+					}else
+					if (window.keysDown.right && this.rightObj)
+					{
+						this.rightObj.activate('right');
+					}else
+					if (window.keysDown.up && this.upObj)
+					{
+						this.upObj.activate('up');
+					}
+				}
+				if (!window.keysDown.action)
+					window.stickyAction = false;
+				if (this.jumpTimer == 0)
+				{
+					this.jumping = false;
+					if (window.keysDown.fire && this.jumpCooldown <= 0)
+					{
+						this.jumped();
+					}else
+					if (window.gunCooldown == 0)
+					{
+						if (window.keysDown.up2)
+						{
+							window.gunCooldown = window.gunCooldownMax;
+							makeBullet({x:this.x+2.5, y:this.y+2.5, dir:-90});
+						}else 
+						if (window.keysDown.down2)
+						{
+							window.gunCooldown = window.gunCooldownMax;
+							makeBullet({x:this.x+2.5, y:this.y+2.5, dir:90});
+						}else 
+						if (window.keysDown.right2)
+						{
+							window.gunCooldown = window.gunCooldownMax;
+							makeBullet({x:this.x+2.5, y:this.y+2.5, dir:0});
+						}else 
+						if (window.keysDown.left2)
+						{
+							window.gunCooldown = window.gunCooldownMax;
+							makeBullet({x:this.x+2.5, y:this.y+2.5, dir:180});
+						}
+					}
+				}
+				if (window.isClient && (this.sendData || !this.sentJump))
+				{
+					if (this.jumping && !this.sentJump)
+						window.socket.emit('update', {name:'guy', x:this.x, y:this.y, nextX:this.nextX, nextY:this.nextY, movingDir:this.movingDir, jumped:true});
+					else
+						window.socket.emit('update', {name:'guy', x:this.x, y:this.y, nextX:this.nextX, nextY:this.nextY, movingDir:this.movingDir});
+					this.sendData = false;
+					this.sentJump = true;
+				}
+			}
+			if (this.jumpTimer > 0)
+			{
+				this.jumpTimer--;
+			}
+			if (this.jumpCooldown > 0)
+			{
+				this.jumpCooldown--;
+			}
+			if (window.gunCooldown > 0)
+			{
+				window.gunCooldown--;
+			}
+			if (this.jumpTimer == 0)
+			{
+				this.jumping = false;
+			}
+		}
+		guy.jumped = function()
+		{
+			this.jumpCooldown = this.jumpCooldownMax;
+			this.jumping = true;
+			this.jumpTimer = this.jumpTimerMax;
+			this.sentJump = false;
+		}
+		guy.draw = function(ctx)
+		{
+			var drawX = this.x;
+			var drawY = this.y;
+			if (this.jumping)
+			{
+				ctx.fillStyle = '#999999';
+				var jumpHeight = (-2*Math.pow(this.jumpTimer/this.jumpTimerMax-.5,2)+1);
+				ctx.fillRect(this.x+jumpHeight*2, this.y+jumpHeight*2, 10, 10);
+				drawY -= jumpHeight*10;
+			}
+			if (window.gunCooldown > 0)
+			{
+				ctx.fillStyle = '#0000ff';
+				var percent = window.gunCooldown/window.gunCooldownMax;
+				ctx.fillRect(drawX+(1-percent)*5, drawY-2, window.gunCooldown/window.gunCooldownMax*10, 2);
+			}
+			if (this.jumpCooldown > 0)
+			{
+				ctx.fillStyle = '#00ff00';
+				var percent = this.jumpCooldown/this.jumpCooldownMax;
+				ctx.fillRect(drawX+(1-percent)*5, drawY+this.height, this.jumpCooldown/this.jumpCooldownMax*10, 2);
+			}
+			ctx.fillStyle = '#ffff00';
+			ctx.fillRect(drawX, drawY, 10, 10);
+			ctx.strokeStyle = '#0000ff';
+			ctx.strokeRect(this.x-45, this.y-45, 100, 100);
+		}
+		window.objects.push(guy);
+		return guy;
+	}
+	$('#container').mousemove(function(e)
+	{
+		if (window.highlighted)
+			window.highlighted.highlighted = false;
+		window.highlighted = getHere({x:e.offsetX, y: e.offsetY, type:'space'});
+		window.highlighted.highlighted = true;
+	});
+	$('#container').mouseup(function(e)
+	{
+		if (window.inGame && !window.isClient)
+		{
+			if (e.which == 1)
+			{
+				if (window.selectedWeapon == 'robot')
+				{
+					var distX = window.guy.x+5 - e.offsetX;
+					var distY = window.guy.y+5 - e.offsetY;
+					if (Math.abs(distX) > 50 ||
+						Math.abs(distY) > 50)
+					{
+						var obj = getHere({x:e.offsetX, y: e.offsetY, type:'space'});
+						if (obj)
+							if (window.trapper.tryFire())
+								window.spawnEnemy({x:obj.x, y:obj.y});
+					}
+				}else
+				{
+					var distX = window.guy.x+5 - e.offsetX;
+					var distY = window.guy.y+5 - e.offsetY;
+					if (Math.abs(distX) > 50 ||
+						Math.abs(distY) > 50)
+					{
+						var obj = getHere({x:e.offsetX, y: e.offsetY, type:'space'});
+						if (obj)
+							if (window.trapper.tryGoo())
+								window.spawnGoo({x:obj.x, y:obj.y});
+					}
+				}
+			}else if (e.which == 3)
+			{
+				if (window.selectedWeapon == 'robot')
+					selectWeapon({weapon:'goo'});
+				else
+					selectWeapon({weapon:'robot'});
+			}
+			//obj.beingRemoved = true;
+		}
+	});
+	$('#container').bind('contextmenu', function(e) {
+		return false;
+	});
+	window.makeBullet = function(data)
+	{
+		var bullet = {};
+		bullet.checkType = function(str)
+		{
+			if (str == 'bullet')
+				return true;
+			return false;
+		}
+		bullet.x = data.x;
+		bullet.y = data.y;
+		bullet.width = 5;
+		bullet.height = 5;
+		bullet.dir = data.dir*Math.PI/180;
+		bullet.draw = function(ctx)
+		{
+			ctx.fillStyle = '#0000ff';
+			ctx.fillRect(this.x, this.y, bullet.width, bullet.height);
+		}
+		bullet.go = function()
+		{
+			if (window.inGame)
+			{
+				var newX = this.x + window.objectspeed*Math.cos(this.dir);
+				var newY = this.y + window.objectspeed*Math.sin(this.dir);
+				if (!checkHere({x:newX, y:newY, type:'space'}))
+					return true;
+				this.x = newX;
+				this.y = newY;
+				
+				for (var i in window.objects)
+				{
+					if (window.objects[i].checkType('wall'))
+						if (distanceBetween(window.objects[i], this) < 10)
+							return true;
+				}
+			}
+		}
+		window.objects.push(bullet);
+		if (window.socket && window.isClient)
+		{
+			window.socket.emit
+			(
+				'update', 
+				{
+					name:'bullet', 
+					x:bullet.x,
+					y:bullet.y,
+					dir:data.dir
+				}
+			);
+		}
+	}
+	window.checkCollisions = function(data)
+	{
+		if (data.obj.beingRemoved)
+			return true;
+		if (data.obj.x < 0)
+			return true;
+		if (data.obj.y < 0)
+			return true;
+		if (data.obj.x > window.stats.gameWidth)
+			return true;
+		if (data.obj.y > window.stats.gameHeight)
+			return true;
+		if (data.obj.checkType('bullet'))
+		{
+			for (var i in window.objects)
+			{
+				if (window.objects[i].checkType('wall'))
+					if (distanceBetween(window.objects[i], data.obj) < 10)
+						return true;
+			}
+		}
+		if (data.obj.checkType('enemy'))
+		{
+			for (var i in window.objects)
+			{
+				if (window.objects[i].checkType('bullet'))
+					if (distanceBetween(window.objects[i], data.obj) < 10)
+						return true;
+			}
+		}
+		return false;
+	}
+	window.tilize = function(amount)
+	{
+		return Math.round(amount/10)*10;
+	}
+	window.distanceBetween = function(obj1, obj2)
+	{
+		var distX = obj1.x+obj1.width/2 - obj2.x-obj2.width/2;
+		var distY = obj1.y+obj1.height/2 - obj2.y-obj2.height/2;
+		var h = Math.sqrt(distX*distX + distY*distY);
+		return h;
+	}
+	window.spawnGoo = function(data)
+	{
+		var gooSpawn = {};
+		gooSpawn.x = data.x;
+		gooSpawn.y = data.y;
+		if (data.gooNumber)
+			gooSpawn.gooNumber = data.gooNumber;
+		gooSpawn.checkType = function(str)
+		{
+			if (str == 'gooSpawn')
+				return true;
+			return false;
+		}
+		gooSpawn.spawnTimer = 20;
+		gooSpawn.go = function()
+		{
+			gooSpawn.spawnTimer -= 1;
+			if (gooSpawn.spawnTimer <= 0)
+			{
+				makeGoo({x:this.x, y:this.y, gooNumber:this.gooNumber});
+				return true;
+			}
+		}
+		gooSpawn.draw = function(ctx)
+		{
+			ctx.strokeStyle = '#00ff00';
+			ctx.strokeRect(this.x-this.spawnTimer, this.y-this.spawnTimer, this.spawnTimer*2+10, this.spawnTimer*2+10);
+		}
+		window.objects.push(gooSpawn);
+		if (window.socket && !gooSpawn.gooNumber)
+		{
+			window.gooNumber++;
+			gooSpawn.gooNumber = window.gooNumber;
+			window.socket.emit
+			(
+				'update', 
+				{
+					name:'goo', 
+					gooNumber:gooSpawn.gooNumber,
+					x:gooSpawn.x,
+					y:gooSpawn.y
+				}
+			);
+		}
+		return gooSpawn;
+	}
+	window.makeGoo = function(data)
+	{
+		var goo = {};
+		goo.z = 1.5;
+		if (data.gooNumber)
+			goo.gooNumber = data.gooNumber;
+		goo.x = data.x;
+		goo.y = data.y;
+		goo.nextX = data.x;
+		goo.nextY = data.y;
+		goo.movingDir = 0;
+		goo.width = 10;
+		goo.height = 10;
+		goo.checkType = function(str)
+		{
+			if (str == 'goo')
+				return true;
+			return false;
+		}
+		goo.draw = function(ctx)
+		{
+			ctx.fillStyle = '#00ff00';
+			ctx.fillRect(this.x, this.y, 10, 10);
+		}
+		goo.go = function()
+		{
+			
+		}
+		window.objects.push(goo);
+	}
+	window.spawnEnemy = function(data)
+	{
+		var enemySpawn = {};
+		enemySpawn.x = data.x;
+		enemySpawn.y = data.y;
+		if (data.enemyNumber)
+			enemySpawn.enemyNumber = data.enemyNumber;
+		enemySpawn.checkType = function(str)
+		{
+			if (str == 'enemySpawn')
+				return true;
+			return false;
+		}
+		enemySpawn.spawnTimer = 20;
+		enemySpawn.go = function()
+		{
+			enemySpawn.spawnTimer -= 1;
+			if (enemySpawn.spawnTimer <= 0)
+			{
+				makeEnemy({x:this.x, y:this.y, enemyNumber:this.enemyNumber});
+				return true;
+			}
+		}
+		enemySpawn.draw = function(ctx)
+		{
+			ctx.strokeStyle = '#ff0000';
+			ctx.strokeRect(this.x-this.spawnTimer, this.y-this.spawnTimer, this.spawnTimer*2+10, this.spawnTimer*2+10);
+		}
+		window.objects.push(enemySpawn);
+		if (window.socket && !enemySpawn.enemyNumber)
+		{
+			window.enemyNumber++;
+			enemySpawn.enemyNumber = window.enemyNumber;
+			window.socket.emit
+			(
+				'update', 
+				{
+					name:'enemy', 
+					enemyNumber:enemySpawn.enemyNumber,
+					x:enemySpawn.x,
+					y:enemySpawn.y
+				}
+			);
+		}
+		return enemySpawn;
+	}
+	window.makeEnemy = function(data)
+	{
+		var enemy = {};
+		if (data.enemyNumber)
+			enemy.enemyNumber = data.enemyNumber;
+		enemy.x = data.x;
+		enemy.y = data.y;
+		enemy.nextX = data.x;
+		enemy.nextY = data.y;
+		enemy.movingDir = 0;
+		enemy.width = 10;
+		enemy.height = 10;
+		enemy.checkType = function(str)
+		{
+			if (str == 'enemy')
+				return true;
+			return false;
+		}
+		enemy.draw = function(ctx)
+		{
+			ctx.fillStyle = '#ff0000';
+			ctx.fillRect(this.x, this.y, 10, 10);
+		}
+		enemy.go = function()
+		{
+			if (window.inGame)
+			{
+				var distX = window.guy.x - this.x;
+				var distY = window.guy.y - this.y;
+				var h = Math.sqrt(distX*distX+distY*distY);
+				for (var i in window.objects)
+				{
+					if (window.objects[i].checkType('bullet'))
+						if (distanceBetween(window.objects[i], this) < 10)
+						{
+							if (window.isClient)
+								window.socket.emit('update', {name:'enemy', num:this.enemyNumber, action:'remove'});
+							return true;
+						}
+				}
+				if (h < 10 && !guy.jumping)
+				{
+					if (window.inGame && window.isClient)
+					{
+						window.endGame({result:'lose'});
+					}else if (window.localGame)
+					{
+						window.endLocalGame({winner:'trapper'});
+					}
+				}
+				if (this.movingDir == 0 ||
+					this.movingDir == 1 && this.x >= this.nextX ||
+					this.movingDir == 3 && this.x <= this.nextX ||
+					this.movingDir == 4 && this.y >= this.nextY ||
+					this.movingDir == 2 && this.y <= this.nextY)
+				{
+					this.movingDir = 0;
+					var tryDown = true;
+					var tryUp = true;
+					var tryRight = true;
+					var tryLeft = true;
+					var iterations = 0;
+					while(this.movingDir == 0 && iterations < 5)
+					{
+						iterations++;
+						if (distX > 0 && (Math.abs(distX) > Math.abs(distY) || (!tryUp && !tryDown)) && tryRight)
+						{
+							if (getRightHere({x:this.nextX+10, y:this.nextY, type:'space'}))
+							{
+								this.movingDir = 1;
+								this.nextX += 10;
+							}else
+								tryRight = false;
+						}else if (distX < 0 && (Math.abs(distX) > Math.abs(distY) || (!tryUp && !tryDown)) && tryLeft)
+						{
+							if (getRightHere({x:this.nextX-10, y:this.nextY, type:'space'}))
+							{
+								this.movingDir = 3;
+								this.nextX -= 10;
+							}else
+								tryLeft = false;
+						}else if (distY > 0 && tryDown)
+						{
+							if (getRightHere({x:this.nextX, y:this.nextY+10, type:'space'}))
+							{
+								this.movingDir = 4;
+								this.nextY += 10;
+							}else
+								tryDown = false;
+						}else if (distY <= 0 && tryUp)
+						{
+							tryDown = false;
+							if (getRightHere({x:this.nextX, y:this.nextY-10, type:'space'}))
+							{
+								this.movingDir = 2;
+								this.nextY -= 10;
+							}else
+								tryUp = false;
+						}else
+							tryUp = false;
+					}
+				}
+				if (this.movingDir == 1)
+				{
+					this.x += window.stats.enemySpeed;
+				}else
+				if (this.movingDir == 3)
+				{
+					this.x -= window.stats.enemySpeed;
+				}else
+				if (this.movingDir == 2)
+				{
+					this.y -= window.stats.enemySpeed;
+				}else
+				if (this.movingDir == 4)
+				{
+					this.y += window.stats.enemySpeed;
+				}
+				
+			}
+		}
+		window.objects.push(enemy);
+	}
+	window.makeWall = function(data)
+	{
+		var wall = {};
+		wall.x = data.x;
+		wall.y = data.y;
+		wall.width = 10;
+		wall.height = 10;
+		wall.checkType = function(str)
+		{
+			if (str == 'wall')
+				return true;
+			return false;
+		}
+		wall.draw = function(ctx)
+		{
+			ctx.fillStyle = '#000000';
+			ctx.fillRect(this.x, this.y, 10, 10);
+		}
+		wall.go = function()
+		{
+			return checkCollisions({type:"enemy", obj:this});
+		}
+		window.objects.push(wall);
+	}
+	window.spawnTable = function(data)
+	{
+		var table = {};
+		table.z = 2;
+		table.x = data.x;
+		table.y = data.y;
+		table.width = 10;
+		table.height = 10;
+		table.checkType = function(str)
+		{
+			if (str == 'table')
+				return true;
+			else if (str == 'wall')
+				return true;
+			return false;
+		}
+		table.activate = function(direction)
+		{
+			if (direction == 'right')
+			{
+				this.x += 10;
+			}else
+			if (direction == 'left')
+			{
+				this.x -= 10;
+			}else
+			if (direction == 'up')
+			{
+				this.y -= 10;
+			}else
+			if (direction == 'down')
+			{
+				this.y += 10;
+			}
+			var butt = getRightHere({x:this.x, y:this.y, type:'button'});
+			if (butt)
+				butt.activate(this);
+			if (window.isClient)
+				window.socket.emit('update', {name:'box', x:this.x, y:this.y});
+		}
+		table.draw = function(ctx)
+		{
+			ctx.fillStyle = "#aa0000";
+			ctx.fillRect(this.x, this.y, 10, 10);
+		}
+		table.go = function()
+		{
+			if (this.beingRemoved)
+				return true;
+		}
+		window.objects.push(table);
+		return table;
+	}
+	window.makeAI = function(data)
+	{
+		var ai = {};
+		ai.x = 0;
+		ai.y = 0;
+		ai.checkType = function(ty)
+		{
+			if (ty == 'AI')
+				return true;
+			return false;
+		}
+		ai.go = function(data)
+		{
+			if (window.inGame)
+			{
+				if (window.trapper.tryFire())
+				{
+					var x = Math.random()*window.stats.gameWidth;
+					var y = Math.random()*window.stats.gameHeight;
+					while (true)
+					{
+						var x = Math.random()*window.stats.gameWidth;
+						var y = Math.random()*window.stats.gameHeight;
+						var distX = window.guy.x+5 - x;
+						var distY = window.guy.y+5 - y;
+						if (Math.abs(distX) > 50 ||
+							Math.abs(distY) > 50)
+						{
+							var obj = getHere({x:x, y:y, type:'space'});
+							if (obj)
+							{
+								window.spawnEnemy({x:obj.x, y:obj.y});
+								break;
+							}
+						}
+					}
+				}
+				//obj.beingRemoved = true;
+			}
+		}
+		ai.draw = function(ctx)
+		{
+			
+		}
+		window.objects.push(ai);
+	}
+	window.spawnFloorButton = function(data)
+	{
+		var button = {};
+		button.z = 1.5;
+		button.x = data.x;
+		button.y = data.y;
+		button.width = 10;
+		button.height = 10;
+		button.checkType = function(str)
+		{
+			if (str == 'button')
+				return true;
+			return false;
+		}
+		button.activate = function(thing)
+		{
+			if (window.inGame && window.isClient)
+			{
+				window.endGame({result:'win'});
+			}else if (window.localGame)
+			{
+				window.endLocalGame({winner:'chaser'});
+			}
+		}
+		button.draw = function(ctx)
+		{
+			ctx.fillStyle = "#77aaff";
+			ctx.fillRect(this.x, this.y, 10, 10);
+		}
+		button.go = function()
+		{
+			if (this.beingRemoved)
+				return true;
+		}
+		window.objects.push(button);
+		return button;
+	}
+	window.makeSpace = function(data)
+	{
+		var space = {};
+		space.z = 1;
+		space.x = data.x;
+		space.y = data.y;
+		space.width = 10;
+		space.height = 10;
+		space.checkType = function(str)
+		{
+			if (str == 'space')
+				return true;
+			return false;
+		}
+		space.draw = function(ctx)
+		{
+			if (this.highlighted)
+				ctx.fillStyle = "#ff0000";
+			else
+				ctx.fillStyle = '#ffffff';
+			ctx.fillRect(this.x, this.y, 10, 10);
+		}
+		space.go = function()
+		{
+			if (this.beingRemoved)
+				return true;
+			//return checkCollisions({type:"enemy", obj:this});
+		}
+		window.objects.push(space);
+	}
+	window.tellDirections = function(obj)
+	{
+		obj.canGoDown = true;
+		obj.canGoUp = true;
+		obj.canGoRight = true;
+		obj.canGoLeft = true;
+		obj.downObj = false;
+		obj.upObj = false;
+		obj.rightObj = false;
+		obj.leftObj = false;
+		if (!obj.jumping)
+			for (var i in window.objects)
+			{
+				if (window.objects[i].checkType('wall'))
+				{
+					var distX1 = window.objects[i].x + window.objects[i].width - obj.x;
+					var distX2 = window.objects[i].x - obj.x - obj.width;
+					var distY1 = window.objects[i].y + window.objects[i].height - obj.y;
+					var distY2 = window.objects[i].y - obj.y - obj.height;
+					if (distY1 > 0 && distY2 < 0 && distX1 > 0 && distX2 < 0)
+					{
+						if (Math.abs(distY1) < Math.abs(distY2) &&
+							Math.abs(distY1) < Math.abs(distX1) &&
+							Math.abs(distY1) < Math.abs(distX2))
+						{
+							obj.y += distY1;
+							obj.canGoDown = false;
+							obj.downObj = window.objects[i];
+						}else
+						if (Math.abs(distY2) < Math.abs(distY1) &&
+							Math.abs(distY2) < Math.abs(distX1) &&
+							Math.abs(distY2) < Math.abs(distX2))
+						{
+							obj.y += distY2;
+							obj.canGoUp = false;
+							obj.upObj = window.objects[i];
+						}else
+						if (Math.abs(distX1) < Math.abs(distY1) &&
+							Math.abs(distX1) < Math.abs(distY2) &&
+							Math.abs(distX1) < Math.abs(distX2))
+						{
+							obj.x += distX1;
+							obj.canGoRight = false;
+							obj.rightObj = window.objects[i];
+						}else
+						if (Math.abs(distX2) < Math.abs(distY1) &&
+							Math.abs(distX2) < Math.abs(distY2) &&
+							Math.abs(distX2) < Math.abs(distX1))
+						{
+							obj.x += distX2;
+							obj.canGoLeft = false;
+							obj.leftObj = window.objects[i];
+						}
+					}
+				}
+			}
+	}
+	window.getRoom = function(data)
+	{
+		var blocks = [];
+		for (var x = data.x; x < data.width+data.x; x += 10)
+		{
+			for (var y = data.y; y < data.height+data.y; y += 10)
+			{
+				blocks.push({x:x, y:y});
+			}
+		}
+		return blocks;
+	}
+	window.getHere = function(data)
+	{
+		for (var i in window.objects)
+		{
+			if (window.objects[i].checkType(data.type))
+			{
+				if (data.x >= window.objects[i].x &&
+					data.x <= window.objects[i].x + window.objects[i].width &&
+					data.y >= window.objects[i].y && 
+					data.y <= window.objects[i].y + window.objects[i].height)
+					return window.objects[i];
+			}
+		}
+		return false;
+	}
+	window.getRightHere = function(data)
+	{
+		for (var i in window.objects)
+		{
+			if (window.objects[i].checkType(data.type))
+			{
+				if (data.x == window.objects[i].x &&
+					data.y == window.objects[i].y)
+					return window.objects[i];
+			}
+		}
+		return false;
+	}
+	window.checkHere = function(data)
+	{
+		for (var i in window.objects)
+		{
+			if (window.objects[i].checkType(data.type))
+			{
+				if (data.x >= window.objects[i].x &&
+					data.x <= window.objects[i].x + window.objects[i].width &&
+					data.y >= window.objects[i].y && 
+					data.y <= window.objects[i].y + window.objects[i].height)
+					return true;
+			}
+		}
+		return false;
+	}
+	window.collides = function(data)
+	{
+		for (var i in window.objects)
+		{
+			if (window.objects[i].checkType(data.type))
+			{
+				if (data.x == window.objects[i].x &&
+					data.y == window.objects[i].y)
+					return true;
+			}
+		}
+		return false;
+	}
+	window.makePaths = function(rooms)
+	{
+		for (var i in rooms)
+		{
+			for (var c in rooms)
+			{
+				if (i != c)
+				{
+					/* the following algorithm is very complicated,
+					 * I definitely gave it my all on this one
+					 * hopefull I can explain it so that you can modify it.
+					 * These first 4 variables determine where the checked
+					 * box is relative to the current one (current one is rooms[i]).
+					 * distX1 is the distance from the checked box's origin
+					 * to the current box's far edge (signed).
+					 * distX2 is the distance from the check box's far edge
+					 * to the current box's origin (signed).
+					 * These are relative to the horizontal, and distY1 and 
+					 * distY2 are relative to the vertical, but they're basically the same
+					 * thing.
+					 * The first if statement checks if the other box is horizontal to the
+					 * current box.
+					 * This check works because if the checked box is below the current, then
+					 * both distY1 and distY2 will be negative.
+					 * If the checked box is above the current then both distY1 and distY2 will
+					 * be positive.
+					 * the case where (distY1 < 0 && distY2 > 0) never occurs because the bottom of 
+					 * the checked box is always bigger than the origin of that box, this means
+					 * distY1 is always bigger than distY2
+					 * The second checks to see if the second box is to the right of the current.
+					 * if it isn't, don't do anything, because the other box will make the path.
+					 * if we did something when the box wasn't to the right of the current(left)
+					 * then we'd end up with duplicate paths since every room is extending
+					 * right and left
+					 * After that we calculate the greatest possible y value for starting the path
+					 * is could either be the farthest point of the checked box, or the farthest
+					 * point of the current box.
+					 * Then we calculate the minimum y value for the start of the path. It could 
+					 * either be the start of the checked box or the start of the current box.
+					 */
+					var distX1 = rooms[i].x + rooms[i].width - rooms[c].x;
+					var distX2 = rooms[i].x - (rooms[c].x + rooms[c].width);
+					var distY1 = rooms[i].y + rooms[i].height - rooms[c].y;
+					var distY2 = rooms[i].y - (rooms[c].y + rooms[c].height);
+					if (distY1 > 0 && distY2 < 0)
+					{// the other box is horizonal to the current
+						if (distX1 < 0 && distX2 < 0)
+						{// the other box is to the right of the current
+							var yMax = rooms[i].y-distY2-10;// first possible xMax
+							var yMax2 = rooms[i].y+rooms[i].height-10;// second possible xMax
+							if (yMax2 < yMax)// we want the smaller one
+								yMax = yMax2;
+							var yMin = rooms[i].y+rooms[i].height-distY1;
+							var yMin2 = rooms[i].y;
+							if (yMin2 > yMin)
+								yMin = yMin2;
+							var randY = yMin+Math.ceil(Math.random()*(yMax-yMin)/10)*10;
+							var blocks = getPassage({
+								x:rooms[i].x+rooms[i].width, 
+								y:randY, 
+								dir:'right', remove:true,
+								len:Math.abs(distX1/10)});
+							for (var p in blocks)
+							{
+								if (!collides({x:blocks[p].x, y:blocks[p].y, type:'space'}))
+									makeSpace(blocks[p]);
+							}
+						}else
+						{// the box is to the left of the current one
+							// this case will be covered by the box that is to the right
+						}
+					}else
+					if (distX1 > 0 && distX2 < 0)// this is default true because boxes never intersect
+					{// this means the other box is vertical to the current one
+						if (Math.abs(distY1) < Math.abs(distY2))
+						{// the other box is below the current one
+							var xMax = rooms[i].x-distX2-10;
+							var xMax2 = rooms[i].x+rooms[i].width-10;
+							if (xMax2 < xMax)
+								xMax = xMax2;
+							var xMin = rooms[i].x+rooms[i].width-distX1;
+							var xMin2 = rooms[i].x;
+							if (xMin2 > xMin)
+								xMin = xMin2;
+							var randX = xMin+Math.ceil(Math.random()*(xMax-xMin)/10)*10;
+							var blocks = getPassage({
+								x:randX, 
+								y:rooms[i].y+rooms[i].height, 
+								dir:'down', remove:true,
+								len:Math.abs(distY1/10)});
+							for (var p in blocks)
+							{
+								if (!collides({x:blocks[p].x, y:blocks[p].y, type:'space'}))
+									makeSpace(blocks[p]);
+							}
+						}else
+						{// the box is above the current one
+							// this case will be covered by the box that is below
+						}
+					}
+				}
+			}
+		}
+	}
+	window.removeBlockAt = function(data)
+	{
+		for (var i = window.objects.length-1; i >= 0; i--)
+		{
+			if (window.objects[i].x == data.x &&
+				window.objects[i].y == data.y)
+			{
+				window.objects.splice(i, 1);
+			}
+		}
+	}
+	window.getPassage = function(data)//({x:20, y:20, dir:'right', len:5});
+	{
+		var blocks = [];
+		var numBlks = 0;
+		var x = data.x;
+		var y = data.y;
+		while  (numBlks < data.len)
+		{
+			numBlks++;
+			blocks.push({x:x, y:y});
+			blocks.push({x:x, y:y});
+			if (data.dir == 'right')
+				x += 10;
+			else if (data.dir == 'left')
+				x -= 10;
+			else if (data.dir == 'up')
+				y -= 10;
+			else if (data.dir == 'down')
+				y += 10;
+		}
+		return blocks;
+	}
+	window.makeLevel = function(data)
+	{
+		//spawnEnemy({x:50, y:70});
+		numberOfRooms = 0;
+		var rooms = [];
+		var iterations = 0;
+		while (numberOfRooms < 5 && iterations < 100)
+		{
+			iterations++;
+			window.minWidth = 70;
+			window.minHeight = 50;
+			window.maxWidth = 180;
+			window.maxHeight = 120;
+			var x = 10*Math.ceil(Math.random()*(window.stats.gameWidth/10-window.maxWidth/10));
+			var y = 10*Math.ceil(Math.random()*(window.stats.gameHeight/10-window.maxHeight/10));
+			var width = minWidth+Math.ceil(Math.random()*minWidth/10)*10;
+			var height = minHeight+Math.ceil(Math.random()*minHeight/10)*10;
+			var roomData = {x:x, y:y, width:width, height:height};
+			var intersectsRoom = false;
+			for (var i in rooms)
+			{
+				var distX1 = rooms[i].x + rooms[i].width - roomData.x;
+				var distX2 = rooms[i].x - roomData.x - roomData.width;
+				var distY1 = rooms[i].y + rooms[i].height - roomData.y;
+				var distY2 = rooms[i].y - roomData.y - roomData.height;
+				if (distY1 > 0 && distY2 < 0 && distX1 > 0 && distX2 < 0)
+				{
+					intersectsRoom = true;
+					break;
+				}
+			}
+			if (!intersectsRoom)
+			{
+				numberOfRooms++;
+				rooms.push(roomData);
+				var blocks = getRoom(roomData);
+				for (var i in blocks)
+				{
+					if (!collides({x:blocks[i].x, y:blocks[i].y, type:'space'}))
+						makeSpace(blocks[i]);
+				}
+			}
+		}
+		// spawn stuff
+		var guyRoom = rooms[Math.floor(Math.random()*rooms.length)];
+		var endRoom = rooms[Math.floor(Math.random()*rooms.length)];
+		while (guyRoom == endRoom)
+		{
+			var endRoom = rooms[Math.floor(Math.random()*rooms.length)];
+		}
+		var guyData = window.spawnRandom(guyRoom);
+		if (data.host)
+			guyData.cantControl = true;
+		if (data.client)
+			guyData.sendsData = true;
+		window.guy = window.spawnGuy(guyData);
+		var table = window.spawnTable(window.spawnRandom(endRoom));
+		window.box = table;
+		var floorbutton = window.spawnRandom(endRoom);
+		while (	floorbutton.x == table.x &&
+				floorbutton.y == table.y)
+		{
+			floorbutton = window.spawnRandom(endRoom);
+		}
+		window.trapper = window.makeTrapper();
+		window.spawnFloorButton(floorbutton);
+		window.makePaths(rooms);
+	}
+	window.spawnRandom = function(room)
+	{
+		return {x:room.x+10+Math.floor(Math.random()*(room.width/10-2))*10, y:room.y+10+Math.floor(Math.random()*(room.height/10-2))*10};
+	}
+	window.drawLoop = function()
+	{
+		window.currentTimeout = setTimeout(window.drawLoop, window.fps);
+		for (var i = window.objects.length-1; i >= 0; i--)
+		{
+			if (window.objects[i].go())
+				window.objects.splice(i, 1);
+		}
+		var canvas = document.getElementById("container");
+		var ctx = canvas.getContext("2d");
+		ctx.clearRect(0, 0, window.stats.gameWidth, window.stats.gameHeight);
+		ctx.fillStyle = '#000000';
+		ctx.fillRect(0, 0, window.stats.gameWidth, window.stats.gameHeight);
+		for (var i = 0; i < window.objects.length-1; i++)
+		{//sorting
+			if (window.objects[i].z > window.objects[i+1].z)
+			{
+				var temp = window.objects[i+1];
+				window.objects[i+1] = window.objects[i];
+				window.objects[i] = temp;
+				i--;
+			}
+		}
+		for (var i in window.objects)
+		{
+			window.objects[i].draw(ctx);
+		}
+	}
+	$(window).on("keydown", function(e)
+	{
+		if (e.which == 73)
+		{
+			window.keysDown.up2 = true;
+		}else
+		if (e.which == 74)
+		{
+			window.keysDown.left2 = true;
+		}else
+		if (e.which == 75)
+		{
+			window.keysDown.down2 = true;
+		}else
+		if (e.which == 76)
+		{
+			window.keysDown.right2 = true;
+		}else
+		if (e.which == 69)
+		{
+			window.keysDown.action = true;
+		}else
+		if (e.which == 32)
+		{
+			window.keysDown.fire = true;
+		}else
+		if (e.which == 87)
+		{
+			window.dir = -90;
+			window.keysDown.up = true;
+		}else
+		if (e.which == 65)
+		{
+			window.dir = 180;
+			window.keysDown.left = true;
+		}else
+		if (e.which == 83)
+		{
+			window.dir = 90;
+			window.keysDown.down = true;
+		}else
+		if (e.which == 68)
+		{
+			window.dir = 0;
+			window.keysDown.right = true;
+		}
+	});
+	$(window).on("keyup", function(e)
+	{
+		if (e.which == 73)
+			window.keysDown.up2 = false;
+		else if (e.which == 74)
+			window.keysDown.left2 = false;
+		else if (e.which == 75)
+			window.keysDown.down2 = false;
+		else if (e.which == 76)
+			window.keysDown.right2 = false;
+		else if (e.which == 69)
+			window.keysDown.action = false;
+		else if (e.which == 32)
+			window.keysDown.fire = false;
+		else if (e.which == 87)
+			window.keysDown.up = false;
+		else if (e.which == 65)
+			window.keysDown.left = false;
+		else if (e.which == 83)
+			window.keysDown.down = false;
+		else if (e.which == 68)
+			window.keysDown.right = false;
+	});
+	window.makeKeyGUI = function()
+	{
+		$('div.server').append('<div id=serverMake></div>');
+		$('div.server div#serverMake').html('Play Multiplayer');
+		$('div.server div#serverMake').on('click', function()
+		{
+			$('div.server div#serverMake').off('click');
+			window.startServer();
+		});
+		$('div.server').append('<div id=addAI></div>');
+		$('div.server div#addAI').html('Add AI trapper');
+		$('div.server div#addAI').on('click', function()
+		{
+			$('div.server div#addAI').remove();
+			window.doingAI = true;
+			window.makeAI();
+		});
+		$('div.tutorial').append('<div id=chaserTut></div>');
+		$('div.tutorial div#chaserTut').html('Chaser Instructions');
+		$('div.tutorial div#chaserTut').on('click', function()
+		{
+			popup({text:'Goal: push the brown block onto the blue square.', button:'more', buttonFunction:window.continueChaserInstructions});
+		});
+		$('div.tutorial').append('<div id=trapperTut></div>');
+		$('div.tutorial div#trapperTut').html('Trapper Instructions');
+		$('div.tutorial div#trapperTut').on('click', function()
+		{
+			popup({text:'Goal: stop the chaser before he completes his goal', button:'more', buttonFunction:window.continueTrapperInstructions});
+		});
+		if (!window.isClient)
+		{
+			window.makeWeaponsGUI();
+		}
+	}
+	window.continueChaserInstructions = function()
+	{
+		unpopup();
+		popup({text:'wasd - move<br/>e + (wasd) - push block<br/>space - jump<br/>ijkl - fire', button:'close', buttonFunction:window.unpopup});
+	}
+	window.continueTrapperInstructions = function()
+	{
+		unpopup();
+		popup({text:'click to use your trap, right click to switch traps<br/>The robot will seek the chaser and the goo will slow him down', button:'close', buttonFunction:window.unpopup});
+	}
+	window.makeWeaponsGUI = function()
+	{
+		$('div.weapons').append('<div class=weapon id=robot><span class=select></span>ROBOT</div>');
+		$('div.weapons').append('<div class=weapon id=goo><span class=select></span>GOO</div>');
+		$('div.weapons div#robot').css('color', '#0044aa');
+		$('div.weapons div#robot').css('border-style', 'solid');
+		$('div.weapons div#robot').css('background-color', '#999999');
+		$('div.weapons div#goo').css('color', '#0044aa');
+		$('div.weapons div#goo').css('border-style', 'solid');
+		$('div.weapons div#goo').css('background-color', '#00ff00');
+		selectWeapon({weapon:'robot'});
+	}
+	window.selectWeapon = function(data)
+	{
+		window.selectedWeapon = data.weapon;
+		$('div.weapon').css('border-width', '0px');
+		$('div.weapon span.select').html("&nbsp;");
+		if (data.weapon == 'robot')
+		{
+			$('div#robot span.select').html("&#9654;");
+			$('div#robot').css('border-width', '2px');
+		}else
+		if (data.weapon == 'goo')
+		{
+			$('div#goo span.select').html("&#9654;");
+			$('div#goo').css('border-width', '2px');
+		}
+	}
+	window.popup = function(data)
+	{
+		var popupBackground = $('<div class=popupBackground></div>');
+		$('div#gui').append(popupBackground);
+		var popup = $('<div class=popup>'+data.text+'</div>');
+		$('div#gui').append(popup);
+		if (data.button)
+		{
+			$('div#gui div.popup').append('<br/>');
+			var popupButton = $('<button>'+data.button+'</button>');
+			$('div#gui div.popup').append(popupButton);
+			popupButton.focus();
+			popupButton.on('click', data.buttonFunction);
+		}
+		if (data.selection)
+		{
+			$('div#gui div.popup').append('<br/>');
+			var popupSelection = $('<input></input>');
+			popupSelection.val(data.selection);
+			$('div#gui div.popup').append(popupSelection);
+		}
+		if (data.bigText)
+		{
+			var popupBigText = $('<div class=bigText>'+data.bigText+'</div>');
+			$('div#gui div.popup').append(popupBigText);
+		}
+	}	
+	window.setBigPopupText = function(data)
+	{
+		$('div#gui div.popup div.bigText').html(data.text);
+	}
+	window.modpopup = function(data)
+	{
+		if (data.button)
+			$('div#gui div.popup button').html(data.button);
+		if (data.buttonOff)
+			$('div#gui div.popup button').off('click');
+	}
+	window.unpopup = function(data)
+	{
+		$('div#gui div.popup').remove();
+		$('div#gui div.popupBackground').remove();
+	}
+	window.startServer = function()
+	{
+		window.inGame = false;
+		window.socket = io.connect('ws://'+window.location.host);
+		window.socket.on('started', function(e)
+		{
+			window.gameID = e.id;
+			$('div.server').html('Server up!');
+			window.popup({text:"Share this link with a friend!", selection:window.location.host+window.location.pathname+'#'+window.gameID});
+		});
+		window.socket.on('friendConnected', function(e)
+		{
+			socket.emit('gameConnect', {id:window.location.hash});
+			window.unpopup();
+			window.objects = [];
+			window.startGame({host:true,socket:socket});
+		});
+		setupSocketUpdate();
+		
+		// set the text to 'loading'
+		$('div.server').html('Starting Server...');
+	}
+	window.beClient = function()
+	{
+		$('div.server').remove();
+		window.gameID = window.location.hash.substring(1);
+		window.location.hash = "";
+		window.popup({text:"Connecting to game...", button:'stop',buttonFunction:window.normalStart});
+		window.socket = io.connect('ws://'+window.location.host);
+		window.socket.emit('gameConnect', {id:window.gameID});
+		window.socket.on('friendConnected', function(e)
+		{
+			window.unpopup();
+			window.startGame({client:true,socket:socket});
+		});
+		setupSocketUpdate();
+	}
+	window.setupSocketUpdate = function(data)
+	{
+		window.socket.on('update', function(e)
+		{
+			if (e.name == 'guy')
+			{
+				window.guy.x = e.x;
+				window.guy.y = e.y;
+				window.guy.nextX = e.nextX;
+				window.guy.nextY = e.nextY;
+				window.guy.movingDir = e.movingDir;
+				if (e.jumped)
+					window.guy.jumped();
+			}else if (e.name == 'box')
+			{
+				window.box.x = e.x;
+				window.box.y = e.y;
+				window.box.activate();
+			}else if (e.name == 'win')
+			{
+				window.endGame({result:'win'});
+			}else if (e.name == 'lose')
+			{
+				window.endGame({result:'lose'});
+			}else if (e.name == 'ready')
+			{
+				window.opponentReady = true;
+				if (window.youReady)
+					window.startGame({client:!window.isClient,host:!window.isHost});
+			}else if (e.name == 'enemy')
+			{
+				if (e.action == 'remove')
+				{
+					for (var i in window.objects)
+					{
+						if (window.objects[i].checkType('enemy') &&
+							window.objects[i].enemyNumber == e.num)
+						{
+							window.objects.splice(i, 1);
+							break;
+						}
+					}
+				}else
+				{
+					spawnEnemy(e);
+				}
+			}else
+			if (e.name == 'bullet')
+			{
+				makeBullet(e);
+			}else
+			if (e.name == 'goo')
+			{
+				spawnGoo(e);
+			}
+		});
+	}
+	window.continueGame = function(data)
+	{
+		if (window.opponentReady)
+		{
+			window.startGame({client:!window.isClient,host:!window.isHost});
+		}else
+		{
+			modpopup({button:'Waiting...', buttonOff:true});
+			window.youReady = true;
+		}
+		window.socket.emit('update', {name:'ready'});
+	}
+	window.startGame = function(data)
+	{
+		window.isClient = data.client;
+		window.isHost = data.host;
+		$('div.server').remove();
+		$('div.weapons').empty();
+		if (window.isHost)
+			window.makeWeaponsGUI();
+		window.localGame = false;
+		window.unpopup();
+		window.enemyNumber = 0;
+		window.gooNumber = 0;
+		window.objects = [];
+		if (data.host)
+			window.popup({text:'You are the trapper!', bigText:"3"});
+		else if (data.client)
+			window.popup({text:'You are the chaser!', bigText:"3"});
+		setTimeout(function()
+		{
+			window.setBigPopupText({text:'2'});
+			setTimeout(function()
+			{
+				window.setBigPopupText({text:'1'});
+				setTimeout(function()
+				{
+					window.inGame = true;
+					window.unpopup();
+					window.levelIterations++;
+					Math.seedrandom(window.gameID+window.levelIterations);
+					window.objects = [];
+					window.makeLevel({difficulty:1,host:data.host,client:data.client,socket:data.socket});
+					clearTimeout(window.currentTimeout);
+					window.currentTimeout = setTimeout(window.drawLoop, 100);
+				}, 1000);
+			}, 1000);
+		}, 1000);
+	}
+	window.endGame = function(data)
+	{
+		window.opponentReady = false;
+		window.youReady = false;
+		window.inGame = false;
+		if (data.result == 'lose')
+		{
+			window.popup({text:'you lose',button:'Swap Roles',buttonFunction:window.continueGame});
+			if (window.isClient)
+				window.socket.emit('update', {name:'win'});
+		}else
+		if (data.result == 'win')
+		{
+			window.popup({text:'you win',button:'Swap Roles',buttonFunction:window.continueGame});
+			if (window.isClient)
+				window.socket.emit('update', {name:'lose'});
+		}
+	}
+	window.normalStart = function()
+	{
+		window.localGame = true;
+		window.objects = [];
+		window.location.hash = "";
+		window.unpopup();
+		window.makeLevel({difficulty:1});
+		clearTimeout(window.currentTimeout);
+		if (window.doingAI)
+			makeAI();
+		window.currentTimeout = setTimeout(window.drawLoop, 100);
+		window.inGame = true;
+	}
+	window.endLocalGame = function(data)
+	{
+		window.inGame = false;
+		if (data.winner == 'chaser')
+			window.popup({text:'chaser wins!', button:'play again', buttonFunction:window.normalStart});
+		if (data.winner == 'trapper')
+			window.popup({text:'trapper wins!', button:'play again', buttonFunction:window.normalStart});
+	}
+	window.makeKeyGUI();
+	if (window.location.hash.length > 1)
+	{
+		beClient();
+	}else
+	{
+		normalStart();
+	}
+});
+</script>
