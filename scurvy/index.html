@@ -1,5 +1,6 @@
 <link rel="stylesheet" type="text/css" href="style.css">
 <script src="../jquery-1.9.1.min.js"></script>
+<script src=tween.min.js></script>
 <script src=three.min.js></script>
 <script src="/socket.io/socket.io.js"></script>
 <script src="../seedrandom.js"></script>
@@ -66,7 +67,9 @@ $(function()
 	window.HEIGHT = 400;
 	window.renderer = new THREE.WebGLRenderer({antialias:true});
     renderer.setSize(WIDTH, HEIGHT);
-    window.gameElement.append(renderer.domElement);
+	window.canvasElement = $('<div></div>');
+	window.canvasElement.append(renderer.domElement);
+    window.gameElement.append(window.canvasElement);
 	window.camera = new THREE.PerspectiveCamera(45, WIDTH / HEIGHT, 0.1, 20000);
     camera.position.set(0,6,4);
     camera.lookAt(new THREE.Vector3( 0, 0, 0 ));
@@ -86,19 +89,39 @@ $(function()
 		}
 	}
 	window.animations = [];
+	window.animationsToRemove = [];
+	window.animationsToAdd = [];
+	window.currAnimationId = 0;
+	window.addAnimation = function(ani)
+	{
+		window.animationsToAdd.push(ani)
+	}
+	window.removeAnimation = function(ani)
+	{
+		ani.removeAnimation = true;
+	}
 	window.renderFunct = function()
 	{
 		requestAnimationFrame(window.renderFunct);
 		var delta = clock.getDelta();
 		for ( var i = 0; i < morphs.length; i ++ ) {
 			morph = morphs[ i ];
-			if (morph.time > 2500)
-				morph.time = 0
 			morph.updateAnimation( 1000 * delta );
 		}
 		for (var i = window.animations.length-1; i >= 0; --i)
 		{
-			window.animations[i].update(delta);
+			if (!window.animations[i].removeAnimation)
+				window.animations[i].update(delta);
+			if (window.animations[i].removeAnimation)
+				window.animations.splice(i, 1);
+		}
+		for (var i = window.animationsToAdd.length-1; i >= 0; i--)
+		{
+			if (i >= 0)
+			{
+				window.animations.push(window.animationsToAdd[i]);
+				window.animationsToAdd.splice(i, 1);
+			}
 		}
 		renderer.render( scene, camera );
 	}

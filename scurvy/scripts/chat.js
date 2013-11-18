@@ -1,6 +1,6 @@
 window.openChat = function()
 {
-	var chatBox = $("<div class=chat id=chat></div>");
+	window.chatBox = $("<div class=chat id=chat></div>");
 	chatBox.css('white-space', 'nowrap');
 	chatBox.css('position', 'absolute');
 	chatBox.css('left', '125');

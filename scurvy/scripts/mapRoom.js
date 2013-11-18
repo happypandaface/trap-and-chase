@@ -97,6 +97,7 @@ actions.push({
 		}
 		window.animations.push(
 		{
+			type:'handAnimation',
 			point:new THREE.Vector3(action.x,action.y,action.z),
 			time:0,
 			hand:hand,
@@ -105,14 +106,14 @@ actions.push({
 			{
 				var dist = this.point.clone().sub(this.hand.mesh.position);
 				//console.log(dist.length());
-				this.hand.mesh.position.add(dist.divideScalar(3));
 				this.time += delta;
 				if (dist.length() < .001 || this.time > .2 || !this.hand)
 				{
 					window.sendMouseTimeout = -1;
 					this.hand.mesh.position = this.point;
 					window.animations.splice(window.animations.indexOf(this), 1);
-				}
+				}else
+					this.hand.mesh.position.add(dist.divideScalar(3));
 			}
 		});
 	}

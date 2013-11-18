@@ -20,6 +20,12 @@ window.gotoGameRoom = function()
 	});
 	window.gameElement.children('#ui').append(window.gameRoom);
 }
+window.getPlayerById = function(id)
+{
+	for (var i in window.players)
+		if (id == window.players[i].playerId)
+			return window.players[i];
+}
 actions.push({
 	type:"gotoGameRoom",
 	funct:function(action){
