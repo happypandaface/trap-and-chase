@@ -11,13 +11,6 @@ window.getSortedPlayers = function()
 	sortedPlayers.sort(function(a,b){return a.playerId.valueOf()>b.playerId.valueOf()});
 	return sortedPlayers;
 }
-window.translateGamePosToRealPos = function(x, y, mesh)
-{
-	if (!mesh)
-		return {x:x, y:-3, z:y};
-	else
-		mesh.position.set(x,-3,y);
-}
 window.gotoFight = function()
 {
 	window.gameElement.children('#ui').empty();
@@ -43,39 +36,31 @@ window.gotoFight = function()
 			morphs.push( meshAnim2 );
 			scene.add( meshAnim2 );
 			console.log(window.players[i].playerId);
-			window.pirates.push({playerId:window.players[i].playerId, mesh:meshAnim2, currX:meshAnim2.position.x, currY:meshAnim2.position.z});
+			window.pirates.push({playerId:window.players[i].playerId, mesh:meshAnim2});
 		}
 		window.myPirate = window.getPirateByPlayerId(window.playerId);
     } );
-	window.moveSpeed = 5;
-	window.moveAnimation = {keyDown:[],time:0,update:function(dt)
+	window.moveAnimation = {keyDown:[],update:function(dt)
 	{
-		if (!this.lastX)
-			this.lastX = window.myPirate.currX;
-		if (!this.lastY)
-			this.lastY = window.myPirate.currY;
-		if (this.keyDown['w'])
-			window.myPirate.currY -= window.moveSpeed*dt;
-		if (this.keyDown['a'])
-			window.myPirate.currX -= window.moveSpeed*dt;
-		if (this.keyDown['s'])
-			window.myPirate.currY += window.moveSpeed*dt;
-		if (this.keyDown['d'])
-			window.myPirate.currX += window.moveSpeed*dt;
-		window.translateGamePosToRealPos(window.myPirate.currX, window.myPirate.currY, window.myPirate.mesh);
 		this.time += dt;
-		if (this.time > .4)
+		if (this.time > .1)
 		{
-			this.time = 0;
-			if (window.myPirate.currY != this.lastY || window.myPirate.currX != this.lastX)
-			{
-				this.lastY = window.myPirate.currX;
-				this.lastY = window.myPirate.currY;
-				window.doAction({type:'movePirate', playerId:window.playerId, x:window.myPirate.currX, y:window.myPirate.currY}, true, true);
-			}
+			var x = 0;
+			var y = 0;
+			if (this.keyDown['w'])
+				y -= 1;
+			if (this.keyDown['a'])
+				x -= 1;
+			if (this.keyDown['s'])
+				y += 1;
+			if (this.keyDown['d'])
+				x += 1;
+			if (y != 0 || x != 0)
+				window.doAction({type:'movePirate', playerId:window.playerId, direction:Math.atan2(y, x)}, true);
+			window.removeAnimation(this);
+			this.inAnimation = false;
 		}
 	}};
-	window.addAnimation(window.moveAnimation);
 	$(window).keydown(function(event)
 	{
 		if (!chatBox.find("input#text").is(":focus"))
@@ -95,6 +80,15 @@ window.gotoFight = function()
 			if (event.which == 68)//d
 			{
 				window.moveAnimation.keyDown['d'] = true;
+			}
+			if (!window.myPirate.inAction)
+			{
+				if (!window.moveAnimation.inAnimation)
+				{
+					window.moveAnimation.inAnimation = true;
+					window.moveAnimation.time = 0;
+					window.addAnimation(window.moveAnimation);
+				}
 			}
 		}
 	});
@@ -169,26 +163,39 @@ actions.push({
 	type:'movePirate',
 	funct:function(action){
 		var pirate = window.getPirateByPlayerId(action.playerId);
+		pirate.inAction = true;
+		//window.myGuy.mesh.position.x += 1;
 		window.addAnimation({
-			type:'pirateMoveAnimation',
+			type:'pirateAnimation',
 			pirate:pirate,
 			time:0,
-			destX:action.x,
-			destY:action.y,
-			distX:action.x-pirate.currX,
-			distY:action.y-pirate.currY,
+			direction:action.direction,
 			update:function(delta)
 			{
 				this.time += delta;
-				this.pirate.currX += this.distX*(delta/.2);
-				this.pirate.currY += this.distY*(delta/.2);
-				window.translateGamePosToRealPos(this.pirate.currX, this.pirate.currY, this.pirate.mesh);
 				if (this.time > .2)
 				{
-					this.pirate.currX = this.destX;
-					this.pirate.currY = this.destY;
+					// do excess
+					pirate.mesh.position.x += 5*(delta-(this.time-.2))*Math.cos(this.direction);
+					pirate.mesh.position.z += 5*(delta-(this.time-.2))*Math.sin(this.direction);
+					// remove this animation
 					window.removeAnimation(this);
+					pirate.inAction = false;
+					if (window.playerId == action.playerId)
+					{
+						window.moveAnimation.time = 1;
+						if (!window.moveAnimation.inAnimation)
+						{
+							window.moveAnimation.inAnimation = true;
+							window.addAnimation(window.moveAnimation);
+						}
+					}	
+				}else
+				{
+					pirate.mesh.position.x += 5*delta*Math.cos(this.direction);
+					pirate.mesh.position.z += 5*delta*Math.sin(this.direction);
 				}
+				
 			}
 		});
 	}

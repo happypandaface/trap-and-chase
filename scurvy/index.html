@@ -94,6 +94,7 @@ $(function()
 	window.currAnimationId = 0;
 	window.addAnimation = function(ani)
 	{
+		ani.removeAnimation = false;
 		window.animationsToAdd.push(ani)
 	}
 	window.removeAnimation = function(ani)
