@@ -1,13 +1,6 @@
 window.players = [];
 window.gameRoom = $("<div class=dialogue id=gameRoom><div id=link></div></div>");
 var linkBox = $('<div>Game Link:<input></input><div>');
-linkBox.children('input').attr('readonly','readonly');
-linkBox.children('input').focus(function() {
-	$(this).select();
-});
-linkBox.children('input').mouseup(function(e) {
-	e.preventDefault();
-});
 window.gameRoom.children('#link').append(linkBox);
 window.gotoGameRoom = function()
 {
@@ -18,9 +11,16 @@ window.gotoGameRoom = function()
 	window.gameRoom.css('width', window.WIDTH*.6);
 	window.gameRoom.css('height', window.HEIGHT*.6);
 	window.gameRoom.css('background-color', '#C40020');
+	linkBox.children('input').focus(function() {
+		$(this).select();
+	});
 	window.gameRoom.find('.fightButton').mouseup(function(e)
 	{
 		window.doAction({type:'fight', from:window.playerId, to:$(this).parent().attr('id')}, true);
+	});
+	linkBox.children('input').attr('readonly','readonly');
+	linkBox.children('input').mouseup(function(e) {
+		e.preventDefault();
 	});
 	linkBox.children('input').attr('value',window.location.href.replace('#','')+'#'+window.gameId);
 	window.gameElement.children('#ui').append(window.gameRoom);
