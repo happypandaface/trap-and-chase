@@ -41,6 +41,7 @@ window.gotoFight = function()
 {// this sets up the fight, this needs to be changed so that it can be called multiple times, needs a destructor.
 	window.gameElement.children('#ui').empty();
 	window.destroyScene();
+	var notPastMine = 1;
 	for (var i in window.players)
 	{
 		var healthBar = $('<div class=healthBar></div>');
@@ -48,7 +49,13 @@ window.gotoFight = function()
 			healthBar.append('<img src=heart.png height=20 width=20 ></img>');
 		}
 		window.gameElement.children('#ui').append(healthBar);
-		healthBar.css('top', parseInt(healthBar.css('top'))+25*i);
+		if (window.players[i].playerId == window.playerId)
+		{
+			notPastMine = 0;
+			healthBar.css('top', parseInt(healthBar.css('top')));
+		}else
+			healthBar.css('top', parseInt(healthBar.css('top'))+25*(parseInt(i)+notPastMine));
+		window.players[i].healthBar = healthBar;
 	}
 	window.directionalLight.position.set(1, 1, 1).normalize();
 	window.scene.add(directionalLight);
@@ -80,7 +87,10 @@ window.gotoFight = function()
 			morphs.push(morphAnimations);
 			scene.add( meshAnim2 );
 			window.hittableObjects.push(meshAnim2);
-			window.pirates.push({lose:window.iLost,hp:3,anims:morphAnimations,playerId:window.players[i].playerId, mesh:meshAnim2, currX:meshAnim2.position.x, currY:meshAnim2.position.z});
+			var pirate = {hp:3,anims:morphAnimations,playerId:window.players[i].playerId, mesh:meshAnim2, currX:meshAnim2.position.x, currY:meshAnim2.position.z};
+			if (window.players[i].playerId == window.playerId)
+				pirate.lose = window.iLost;
+			window.pirates.push(pirate);
 		}
 		window.myPirate = window.getPirateByPlayerId(window.playerId);
     } );
@@ -113,7 +123,7 @@ window.gotoFight = function()
 	window.mouseY = 1;
 	window.updateAnimation = {keyDown:[],time:0,update:function(dt)
 	{
-		if (!window.charFrozen)
+		if (!window.myPirate.frozen)
 		{
 			var elem = window.renderer.domElement, 
 				boundingRect = elem.getBoundingClientRect(),
@@ -259,13 +269,12 @@ window.gotoFight = function()
 	window.mousePlane.rotation.x = -Math.PI/2;
 	//window.mousePlane.visible = false;
 	window.scene.add(window.mousePlane);
-	window.charFrozen = false;
 	window.endingGame = false;
 }
 window.iLost = function()
 {
-	window.charFrozen = true;
-	window.doAction({type:'iLost', playerId:window.playerId}, true);
+	window.myPirate.frozen = true;
+	window.doAction({type:'pirateDead', playerId:window.playerId}, true);
 }
 window.switchAnimation = function(anims, animation)
 {
@@ -297,15 +306,12 @@ window.getHittableObjectByFunct = function(funct)
 }
 window.getHit = function(pirate)
 {
-	if (!pirate.blocking)
+	pirate.hp--;
+	if (pirate.hp == 0 && pirate.lose)
+		pirate.lose();
+	for (var i = 3; i > pirate.hp; --i)
 	{
-		pirate.hp--;
-		if (pirate.hp == 0)
-			pirate.lose();
-		for (var i = 3; i > pirate.hp; --i)
-		{
-			$($(window.gameElement.children('#ui').children('.healthBar')[0]).children('img')[i-1]).attr('src', 'jolly.png');
-		}
+		$(window.getPlayerById(pirate.playerId).healthBar.children('img')[i-1]).attr('src', 'jolly.png');
 	}
 }
 actions.push({
@@ -365,10 +371,67 @@ actions.push({
 	}
 });
 actions.push({
-	type:'iLost',
+	type:'lostALife',
+	funct:function(action){
+		window.getHit(window.getPirateByPlayerId(action.playerId));
+	}
+});
+actions.push({
+	type:'pushedBack',
+	funct:function(action){
+		var pirate = window.getPirateByPlayerId(action.playerId);
+		pirate.frozen = true;
+		// remove other pirate actions for the same pirate
+		window.removeAnimationFunct(function(anim){
+			if (anim.pirate && anim.pirate.playerId == action.playerId)
+			{
+				return true;
+			}
+		});
+		var strength = 7;
+		window.addAnimation({
+			type:'piratePushedBack',
+			pirate:pirate,
+			time:0,
+			direction:action.direction,
+			strength:strength,
+			update:function(delta)
+			{
+				this.time += delta;
+				var nextX = this.pirate.currX + Math.cos(this.direction)*this.strength*delta;
+				var nextY = this.pirate.currY + Math.sin(this.direction)*this.strength*delta;
+				var nextPos = window.checkPossibleLocation(nextX, nextY);
+				if (nextPos != null)
+				{
+					this.pirate.currX = nextPos.x;
+					this.pirate.currY = nextPos.y;
+				}
+				window.translateGamePosToRealPos(this.pirate.currX, this.pirate.currY, this.pirate.mesh);
+				if (this.time > .8)
+				{
+					this.pirate.blocking = false;
+					this.pirate.inAction = false;
+					this.pirate.anims.currentAnimation = 'standing';
+					this.pirate.frozen = false;
+					window.removeAnimation(this);
+				}
+			}
+		});
+	}
+});
+actions.push({
+	type:'pirateDead',
 	funct:function(action){
 		var pirate = window.getPirateByPlayerId(action.playerId);
 		pirate.dead = true;
+		pirate.mesh.rotation.set(0, 0, 0);
+		// remove other pirate actions for the same pirate
+		window.removeAnimationFunct(function(anim){
+			if (anim.pirate && anim.pirate.playerId == action.playerId)
+			{
+				return true;
+			}
+		});
 		var livingPirates = 0;
 		if (!window.endingGame)
 		{
@@ -382,7 +445,6 @@ actions.push({
 					window.endText = "You Win!";
 				else
 					window.endText = "You Lose!";
-				console.log(window.endText);
 				window.gameElement.children('#ui').append('<div id=endText class=endText>'+window.endText+'</div>');
 				window.addAnimation(
 				{time:0,
@@ -399,14 +461,6 @@ actions.push({
 				});
 			}
 		}
-		// remove other pirate actions for the same pirate
-		window.removeAnimationFunct(function(anim){
-			if (anim.pirate && anim.pirate.playerId == action.playerId)
-			{
-				return true;
-			}
-		});
-		pirate.mesh.rotation.set(0, 0, 0);
 	}
 });
 actions.push({
@@ -449,7 +503,6 @@ actions.push({
 						var intersects = ray.intersectObjects( window.hittableObjects );
 						if (intersects.length > 0)
 						{
-							console.log(intersects[0].distance);
 							if (intersects[0].distance < 5)
 							{
 								var objHit = window.getHittableObjectByFunct(function(obj)
@@ -462,7 +515,10 @@ actions.push({
 									if (this.pirate.playerId != window.playerId &&
 										objHit.playerId == window.playerId)
 									{
-										window.getHit(objHit);
+										if (!objHit.blocking)// eventually calculate direction the pirate is facing
+											window.doAction({type:'lostALife', playerId:window.playerId}, true);
+										else
+											window.doAction({type:'pushedBack', playerId:window.playerId, direction:this.pirate.mesh.rotation.z+Math.PI/2}, true);
 									}
 								}
 							}
@@ -477,7 +533,7 @@ actions.push({
 				}else
 				if (this.actionType == 'block')
 				{
-					if (this.time > .1 && this.startedBlock)
+					if (this.time > .1 && !this.startedBlock)
 					{
 						this.startedBlock = true;
 						this.pirate.blocking = true;
@@ -494,32 +550,3 @@ actions.push({
 		});
 	}
 });
-/*
-actions.push({
-	type:'rotatePirate',
-	funct:function(action){
-		var pirate = window.getPirateByPlayerId(action.playerId);
-		var dist = (action.direction-pirate.mesh.rotation.z);
-		while (dist > Math.PI/2)
-			dist -= Math.PI;
-		while (dist < -Math.PI/2)
-			dist += Math.PI;
-		window.addAnimation({
-			type:'pirateRotationAnimation',
-			pirate:pirate,
-			time:0,
-			direction:action.direction,
-			dist:dist,
-			update:function(delta)
-			{
-				this.time += delta;
-				this.pirate.mesh.rotation.z += this.dist*(delta/.2);
-				if (this.time > .2)
-				{
-					this.pirate.mesh.rotation.z = this.direction;
-					window.removeAnimation(this);
-				}
-			}
-		});
-	}
-});*/
