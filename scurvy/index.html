@@ -26,7 +26,7 @@ $(function()
 		});
 		window.socket.on('friendConnected', function(e)
 		{
-			friendConnected();
+			friendConnected(e);
 		});
 		window.socket.on('update', function(e)
 		{
@@ -42,10 +42,10 @@ $(function()
 		window.socket = io.connect('ws://'+window.location.host);
 		window.gameId = window.location.hash.substring(1);
 		window.location.hash = "";
-		window.socket.emit('gameConnect', {id:window.gameId});
 		window.socket.on('started', function(e)
 		{
 			window.playerId = e.id;
+			window.socket.emit('gameConnect', {id:window.gameId, playerId:window.playerId});
 			console.log(window.playerId);
 			connectedToServer();
 		});
@@ -170,8 +170,63 @@ $(function()
 	}
 	requestAnimationFrame(window.renderFunct);
 	window.connectedToServer = function(){}
-	if (window.location.hash == "" || window.location.hash == "#")
+	window.newPlayerFunctions = [];
+	window.modNewPlayerFunctions = function(funct)
 	{
+		for (var i in window.newPlayerFunctions)
+		{
+			if (funct(window.newPlayerFunctions[i]))
+				break;
+		}
+	}
+	window.getNPF = function(id)
+	{
+		for (var i in window.newPlayerFunctions)
+		{
+			if (window.newPlayerFunctions[i].id == id)
+				return window.newPlayerFunctions[i];
+		}
+	}
+	window.removeNewPlayerFunction = function(funct)
+	{
+		funct.removeThis = true;
+	}
+	window.doNewPlayerFunctions = function(data)
+	{
+		for (var i = window.newPlayerFunctions.length-1; i >= 0; --i)
+		{
+			if (!window.newPlayerFunctions[i].removeThis)
+				window.newPlayerFunctions[i].funct(data);
+			else
+				window.newPlayerFunctions.splice(i, 1);
+		}
+	}
+	window.addNewPlayerFunction = function(funct)
+	{
+		window.newPlayerFunctions.push(funct);
+	}
+	window.addNewPlayerFunction(
+	{
+		id:"gotoCurrentRoom",
+		roomFunctionName:"gotoGameRoom",
+		funct:function(data)
+		{
+			doAction({type:this.roomFunctionName, playerId:data.playerId}, true, true);
+		}
+	});
+	window.addNewPlayerFunction(
+	{
+		id:"resendPlayers",
+		funct:function(data)
+		{
+			for (var i in window.players)
+			{
+				doAction({type:"joinedGameRoom", playerId:window.players[i].playerId}, true);
+			}
+		}
+	});
+	if (window.location.hash == "" || window.location.hash == "#")
+	{// server side
 		window.connectedToServer = function()
 		{
 			window.gameId = window.playerId;
@@ -181,18 +236,14 @@ $(function()
 			doAction({type:"joinedGameRoom", playerId:window.playerId}, true);
 			//doAction({type:"makeHand", playerId:window.playerId});
 		}
-		window.friendConnected = function()
+		window.friendConnected = function(data)
 		{
-			doAction({type:"gotoGameRoom"}, true, true);
-			for (var i in window.players)
-			{
-				doAction({type:"joinedGameRoom", playerId:window.players[i].playerId}, true, true);
-			}
+			window.doNewPlayerFunctions(data);
 			//doAction({type:"makeHand", playerId:window.playerId}, true, true);
 		}
 		window.startServer();
 	}else
-	{
+	{// client side
 		window.connectedToServer = function()
 		{
 			//doAction({type:"makeHand", playerId:window.playerId}, true);
