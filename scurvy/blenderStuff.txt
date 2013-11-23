@@ -1,0 +1,1 @@
+I'm using the exporter for 2.65 for blender v2.66 and to export individual meshes you have to uncheck "all meshes" and only select the ones you wanna export.

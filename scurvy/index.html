@@ -75,6 +75,17 @@ $(function()
     camera.lookAt(new THREE.Vector3( 0, 0, 0 ));
     scene.add(camera);
 	window.morphs = [];
+	window.removeMorph = function(anim)
+	{
+		for (var i in window.morphs)
+		{
+			if (window.morphs[i] == anim)
+			{
+				window.morphs.splice(i, 1);
+				break;
+			}
+		}
+	}
 	window.clock = new THREE.Clock();
 	window.loader = new THREE.JSONLoader();
 	window.projector = new THREE.Projector();

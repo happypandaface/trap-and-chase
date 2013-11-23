@@ -70,9 +70,19 @@ window.gotoFight = function()
 		} );
 		loader.load( "pirateShip.js", function( geometry, materials ) {
 			var material = new THREE.MeshFaceMaterial( materials );
+			console.log(geometry);
 			var meshAnim2 = new THREE.Mesh( geometry, material );
 			meshAnim2.position.set(0,-12,0);
 			meshAnim2.scale.set( 2, 2, 2 );
+			window.scene.add(meshAnim2);
+		} );
+		loader.load( "pirateShipHit.js", function( geometry, materials ) {
+			var material = new THREE.MeshFaceMaterial( materials );
+			console.log(geometry);
+			var meshAnim2 = new THREE.Mesh( geometry, material );
+			meshAnim2.position.set(0,-12,0);
+			meshAnim2.scale.set( 2, 2, 2 );
+			meshAnim2.visible = false;
 			window.walkableMeshes = [meshAnim2];
 			window.scene.add(meshAnim2);
 		} );
@@ -82,19 +92,44 @@ window.gotoFight = function()
 		// initialize mouse so it doesn't throw errors before you move it.
 		window.mouseX = 1;
 		window.mouseY = 1;
-		window.updateAnimation = {keyDown:[],time:0,update:function(dt)
+		window.centerCamera = {scaleVector:new THREE.Vector3(0,20, 7),update:function(dt)
+		{
+			var origin = new THREE.Vector3(0, 0, 0);
+			if (window.pirates.length > 0)
+			{
+				for (var i in window.pirates)
+				{
+					origin.add(new THREE.Vector3(window.pirates[i].currX, 0, window.pirates[i].currY));
+				}
+				origin.divideScalar(window.pirates.length);
+				var variance = 0;
+				for (var i in window.pirates)
+				{
+					variance += origin.clone().sub(new THREE.Vector3(window.pirates[i].currX, 0, window.pirates[i].currY)).lengthSq();
+				}
+				
+				window.camera.position = window.myPirate.mesh.position.clone().add(this.scaleVector);
+				//window.camera.position = origin.clone().add(this.scaleVector.clone().multiplyScalar(1));//.5+Math.sqrt(variance*.05)));
+				//origin.clone().add(this.scaleVector.clone().multiplyScalar(1));//.5+Math.sqrt(variance*.05)));
+			}
+		}}
+		window.addAnimation(window.centerCamera);
+		window.updateAnimation = {scaleVector:new THREE.Vector3(0,20, 7),keyDown:[],time:0,update:function(dt)
 		{
 			if (!window.myPirate.frozen)
 			{
+			/*
 				var elem = window.renderer.domElement, 
 					boundingRect = elem.getBoundingClientRect(),
 					x = (window.mouseX - boundingRect.left) * (elem.width / boundingRect.width),
-					y = (window.mouseY - boundingRect.top) * (elem.height / boundingRect.height);
-				var vector = new THREE.Vector3( 
-					( x / WIDTH ) * 2 - 1, 
-					- ( y / HEIGHT ) * 2 + 1, 
+					y = (window.mouseY - boundingRect.top) * (elem.height / boundingRect.height);*/
+				/*
+				var vector = new THREE.Vector3(
+					( window.mouseX / WIDTH ) * 2 - 1, 
+					- ( window.mouseY / HEIGHT ) * 2 + 1, 
 					0.5 
 				);
+				//console.log(Math.floor(point.x) + ", " + Math.floor(point.z));
 				projector.unprojectVector( vector, camera );
 				var ray = new THREE.Raycaster( camera.position, vector.sub( camera.position ).normalize() );
 				var intersects = ray.intersectObject( window.mousePlane );
@@ -104,6 +139,8 @@ window.gotoFight = function()
 					var diff = window.myPirate.mesh.position.clone().sub(point);
 					window.myPirate.mesh.rotation.z = Math.atan2(diff.z, diff.x)+Math.PI/2;
 				}
+				*/
+				window.myPirate.mesh.rotation.z = Math.atan2(window.mouseY/window.HEIGHT-.5, window.mouseX/window.WIDTH-.5)-Math.PI/2;
 				if (!this.lastX)
 					this.lastX = window.myPirate.currX;
 				if (!this.lastY)
@@ -241,8 +278,11 @@ window.remakeHealthBars = function()
 	{
 		var healthBar = $('<div class=healthBar></div>');
 		var pirate = window.getPirateByPlayerId(window.players[i].playerId);
-		for (var c = 0; c < pirate.hp; ++c){
-			healthBar.append('<img src=heart.png height=20 width=20 ></img>');
+		for (var c = 0; c < 3; ++c){
+			if (c > pirate.hp)
+				healthBar.append('<img src=jolly.png height=20 width=20 ></img>');
+			else
+				healthBar.append('<img src=heart.png height=20 width=20 ></img>');
 		}
 		window.gameElement.children('#ui').append(healthBar);
 		if (window.players[i].playerId == window.playerId)
@@ -299,53 +339,84 @@ window.getHit = function(pirate)
 }
 window.makePirateFor = function(id)
 {
-	if (window.currentRoom == "fightRoom")
+	loader.load( "pirate.js", function( geometry, materials ) {
+		geometry.computeMorphNormals();
+		materials[0].morphTargets = true;
+		materials[1].morphTargets = true;
+		materials[2].morphTargets = true;
+		var material = new THREE.MeshFaceMaterial( materials );
+		window.getSortedPlayers();
+		var pirateMade = false;
+		for (var c in window.pirates)
+		{
+			if (window.pirates[c].playerId == id)
+			{
+				pirateMade = true;
+			}
+		}
+		if (!pirateMade)
+		{
+			var meshAnim2 = new THREE.MorphAnimMesh( geometry, material );
+			meshAnim2.scale.set( 1, 1, 1 );
+			meshAnim2.rotation.x = Math.PI/2;
+			meshAnim2.position.set(2,-3,-5);
+			var morphAnimations = {morph:meshAnim2,animations:[],totalFrames:60,speed:.45};
+			morphAnimations.animations['walking'] = {start:1,end:20};
+			morphAnimations.animations['fighting'] = {start:21,end:45};
+			morphAnimations.animations['blocking'] = {start:46,end:50,dontLoop:true};
+			morphAnimations.animations['standing'] = {start:51,end:60};
+			morphAnimations.currentAnimation = 'standing';
+			morphs.push(morphAnimations);
+			scene.add( meshAnim2 );
+			window.hittableObjects.push(meshAnim2);
+			var pirate = {hp:3,anims:morphAnimations,playerId:id, mesh:meshAnim2, currX:meshAnim2.position.x, currY:meshAnim2.position.z};
+			if (id == window.playerId)
+				pirate.lose = window.iLost;
+			window.pirates.push(pirate);
+		}
+		window.myPirate = window.getPirateByPlayerId(window.playerId);
+		window.remakeHealthBars();
+	});
+}
+window.removePirateById = function(id)
+{
+	for (var c in window.pirates)
 	{
-		loader.load( "pirate.js", function( geometry, materials ) {
-			geometry.computeMorphNormals();
-			materials[0].morphTargets = true;
-			materials[1].morphTargets = true;
-			materials[2].morphTargets = true;
-			var material = new THREE.MeshFaceMaterial( materials );
-			window.getSortedPlayers();
-			var pirateMade = false;
-			for (var c in window.pirates)
-			{
-				if (window.pirates[c].playerId == id)
+		if (window.pirates[c].playerId == id)
+		{
+			var pirate = window.pirates[c];
+			window.removeAnimationFunct(function(anim){
+				if (anim.pirate && anim.pirate.playerId == pirate.playerId)
 				{
-					pirateMade = true;
+					return true;
 				}
-			}
-			if (!pirateMade)
-			{
-				var meshAnim2 = new THREE.MorphAnimMesh( geometry, material );
-				meshAnim2.scale.set( 1, 1, 1 );
-				meshAnim2.rotation.x = Math.PI/2;
-				meshAnim2.position.set(2,-3,-5);
-				var morphAnimations = {morph:meshAnim2,animations:[],totalFrames:60,speed:.45};
-				morphAnimations.animations['walking'] = {start:1,end:20};
-				morphAnimations.animations['fighting'] = {start:21,end:45};
-				morphAnimations.animations['blocking'] = {start:46,end:50,dontLoop:true};
-				morphAnimations.animations['standing'] = {start:51,end:60};
-				morphAnimations.currentAnimation = 'standing';
-				morphs.push(morphAnimations);
-				scene.add( meshAnim2 );
-				window.hittableObjects.push(meshAnim2);
-				var pirate = {hp:3,anims:morphAnimations,playerId:id, mesh:meshAnim2, currX:meshAnim2.position.x, currY:meshAnim2.position.z};
-				if (id == window.playerId)
-					pirate.lose = window.iLost;
-				window.pirates.push(pirate);
-			}
-			window.myPirate = window.getPirateByPlayerId(window.playerId);
-			window.remakeHealthBars();
-		});
+			});
+			window.scene.remove(pirate.mesh);
+			window.removeMorph(pirate.anims);
+			window.pirates.splice(c, 1);
+			break;
+		}
 	}
 }
+actions.push({
+	type:"disconnect",
+	subType:["fightRoom"],
+	funct:function(action){
+		if (window.currentRoom == "fightRoom")
+		{
+			window.removePirateById(action.playerId);
+			window.remakeHealthBars();
+		}
+	}
+});
 actions.push({
 	type:"joinedGameRoom",
 	subType:["fightRoom"],
 	funct:function(action){
-		window.makePirateFor(action.playerId);
+		if (window.currentRoom == "fightRoom")
+		{
+			window.makePirateFor(action.playerId);
+		}
 	}
 });
 actions.push({
@@ -489,6 +560,7 @@ actions.push({
 						{
 							window.gotoGameRoom();
 							window.removeAnimation(window.updateAnimation);
+							window.removeAnimation(window.centerCamera);
 							window.removeAnimation(this);
 						}
 					}
@@ -530,6 +602,45 @@ actions.push({
 					if (this.time > .8 && !this.startedAttack)
 					{
 						this.startedAttack = true;
+						// new hit code
+						var closestDist = 5;
+						var closestObject = null;
+						for (var i in window.hittableObjects)
+						{
+							var obj = window.getHittableObjectByFunct(function(obj)
+								{
+									if (obj.mesh == window.hittableObjects[i])
+										return true;
+								});
+							if (obj.playerId != this.pirate.playerId)
+							{
+								var point = window.hittableObjects[i].position;
+								var diff = this.pirate.mesh.position.clone().sub(point);
+								var len = diff.length();
+								if (diff.length() < closestDist)
+								{
+									var diffRot = Math.abs(this.pirate.mesh.rotation.z-Math.PI/2 - Math.atan2(diff.z, diff.x));
+									if (diffRot > Math.PI)
+										diffRot -= Math.PI*2;
+									if (Math.abs(diffRot) < Math.PI/6)
+									{
+										closestDist = len;
+										closestObject = obj;
+									}
+								}
+							}
+						}
+						if (closestObject != null)
+						{
+							if (closestObject.playerId == window.playerId)
+							{
+								if (!closestObject.blocking)// eventually calculate direction the pirate is facing
+									window.doAction({type:'lostALife', playerId:window.playerId}, true);
+								else
+									window.doAction({type:'pushedBack', playerId:window.playerId, direction:this.pirate.mesh.rotation.z+Math.PI/2}, true);
+							}
+						}
+						/*
 						var pLocal = new THREE.Vector3( 0, 1, 0 );
 						var pWorld = pLocal.applyMatrix4( this.pirate.mesh.matrixWorld );
 						var dir = pWorld.sub( this.pirate.mesh.position ).normalize();
@@ -557,6 +668,7 @@ actions.push({
 								}
 							}
 						}
+						*/
 					}else
 					if (this.time > 1)
 					{
