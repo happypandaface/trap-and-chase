@@ -12,6 +12,8 @@ window.actions = [];
 <script src="scripts/gameRoom.js"></script>
 <script src="scripts/fight.js"></script>
 <script src="scripts/tutorials.js"></script>
+<script src="scripts/shipFight.js"></script>
+<script src="scripts/fightActions.js"></script>
 <script src="scripts/TextureAnimator.js"></script>
 <body><div id=gameDiv style="position:absolute;width:600;height:400;"></div></body>
 <script>
@@ -155,7 +157,7 @@ $(function()
 				if (currFrame >= currAni.end && !currAni.dontLoop)
 					morph.time -= (currAni.end-currAni.start)*duration/morphs[i].totalFrames;
 				if (!currAni.dontLoop || currFrame <= currAni.end)
-					morph.updateAnimation( duration*morphs[i].speed*delta );
+					morph.updateAnimation( duration*morphs[i].speed*currAni.speed*delta );
 			}
 			//console.log('2',currFrame);
 		}
