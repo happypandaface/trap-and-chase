@@ -17,10 +17,11 @@ window.gotoGameRoom = function()
 		window.gameRoom.css('width', window.WIDTH*.6);
 		window.gameRoom.css('height', window.HEIGHT*.6);
 		window.gameRoom.css('background-color', '#C40020');
-		linkBox.children('input').focus(function() {
+		linkBox.children('input').mouseup(function() {
 			$(this).select();
 		});
 		linkBox.children('input').attr('readonly','readonly');
+		linkBox.children('input').css('width',250);
 		linkBox.children('input').mouseup(function(e) {
 			e.preventDefault();
 		});
