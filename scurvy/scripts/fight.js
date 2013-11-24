@@ -18,7 +18,10 @@ window.translateGamePosToRealPos = function(x, y, mesh)
 }
 window.checkPossibleLocation = function(x, y)
 {// check if a player can go to this location and if not try and return the closest spot they can go to.
-	var ray = new THREE.Raycaster( new THREE.Vector3(x, -3, y), new THREE.Vector3(0, -3, 0).normalize() );
+	var vector = new THREE.Vector3(0, -3, 0).normalize();
+	vector.applyQuaternion(window.shipGroup.quaternion);
+	var ray = new THREE.Raycaster( new THREE.Vector3(x, -3, y), vector );
+	window.shipGroup
 	var intersects = ray.intersectObjects( window.walkableMeshes );
 	if (intersects.length == 0)
 		return null;// if it doesn't intersect a walkable mesh, tell them they can't go there
@@ -30,6 +33,17 @@ window.checkPossibleLocation = function(x, y)
 		{
 			// this means the point is in the barrel, return the nearest point on the barrel's perimeter
 			bar.add(pos.sub(bar).normalize().multiplyScalar(window.barrels[i].size));
+			return {x:bar.x, y:bar.y};
+		}
+	}
+	for (var i in window.solidObjects)
+	{
+		var pos = new THREE.Vector2(x, y);
+		var bar = new THREE.Vector2(window.solidObjects[i].x, window.solidObjects[i].y);
+		if (pos.distanceTo(bar) < window.solidObjects[i].size)
+		{
+			// this means the point is in the barrel, return the nearest point on the barrel's perimeter
+			bar.add(pos.sub(bar).normalize().multiplyScalar(window.solidObjects[i].size));
 			return {x:bar.x, y:bar.y};
 		}
 	}
@@ -51,10 +65,12 @@ window.gotoFight = function()
 		camera.lookAt(new THREE.Vector3( 0, 0, 0 ));
 		window.hittableObjects = [];
 		window.pirates = [];
+		window.shipGroup = new THREE.Object3D();
 		for (var i in window.players)
 		{
 			window.makePirateFor(window.players[i].playerId);
 		}
+		window.solidObjects = [];
 		window.barrels = [{x:2,y:0,size:1.5}];
 		loader.load( "pirateBarrel.js", function( geometry, materials ) {
 			var material = new THREE.MeshFaceMaterial( materials );
@@ -63,10 +79,75 @@ window.gotoFight = function()
 				var meshAnim2 = new THREE.Mesh( geometry, material );
 				meshAnim2.scale.set( 1, 1, 1 );
 				meshAnim2.position.set(	window.barrels[i].x,-4,	window.barrels[i].y);
-				scene.add( meshAnim2 );
+				window.shipGroup.add( meshAnim2 );
 				window.hittableObjects.push(meshAnim2);
 				window.barrels[i].mesh = meshAnim2;
+				window.barrels[i].getHit = function()
+				{
+					if (!this.onFire && !this.exploded)
+					{
+						this.onFire = true;
+						var fireTex = new THREE.ImageUtils.loadTexture("fireTex.png");
+						this.boomer = new TextureAnimator( fireTex, 4, 4, 16, 55 ); // texture, #horiz, #vert, #total, duration.
+						window.addAnimatedTexture(this.boomer);
+						var materials = (new THREE.MeshBasicMaterial({map:fireTex, transparent: true}));
+						this.fireMesh = new THREE.Mesh(new THREE.PlaneGeometry(4, 4), materials);
+						this.fireMesh.position = this.mesh.position.clone().add(new THREE.Vector3(0,3,0));
+						this.fireMesh.rotation.x = 0;
+						window.shipGroup.add(this.fireMesh);
+						window.addAnimation({time:0,barrel:this,update:function(dt)
+						{
+							this.time += dt;
+							if (this.time > 3)
+							{
+								window.removeAnimation(this);
+								this.barrel.exploded = true;
+								this.barrel.onFire = false;
+								loader.load( "pirateBarrelExploded.js", function( barrel )
+								{return function( geometry, materials ){
+									var material = new THREE.MeshFaceMaterial( materials );
+									var meshAnim2 = new THREE.Mesh( geometry, material );
+									meshAnim2.position.set(	barrel.mesh.position.x, barrel.mesh.position.y, barrel.mesh.position.z);
+									window.shipGroup.add( meshAnim2 );
+								}}(this.barrel));
+								var expTex = new THREE.ImageUtils.loadTexture("explosionTex.png");
+								var expAni = new TextureAnimator( expTex, 4, 4, 16, 65 ); // texture, #horiz, #vert, #total, duration.
+								window.addAnimatedTexture(expAni);
+								var materials = (new THREE.MeshBasicMaterial({map:expTex, transparent: true}));
+								var expMesh = new THREE.Mesh(new THREE.PlaneGeometry(7, 7), materials);
+								expMesh.position = this.barrel.mesh.position.clone().add(new THREE.Vector3(0,2,0));
+								expMesh.rotation.x = 0;
+								window.shipGroup.add(expMesh);
+								window.addAnimation({time:0,expMesh:expMesh,expAni:expAni,update:function(dt)
+								{
+									this.time += dt;
+									if (this.time > 1)
+									{
+										window.removeAnimation(this);
+										window.shipGroup.remove(this.expMesh);
+										window.removeAnimatedTexture(this.expAni);
+									}
+								}});
+								window.shipGroup.remove(this.barrel.mesh);
+								window.shipGroup.remove(this.barrel.fireMesh);
+								window.removeAnimatedTexture(this.barrel.boomer);
+							}
+						}});
+					}
+				}
 			}
+		} );
+		loader.load( "pirateSail.js", function( geometry, materials ) {
+			var material = new THREE.MeshFaceMaterial( materials );
+			console.log(geometry);
+			var meshAnim2 = new THREE.Mesh( geometry, material );
+			meshAnim2.rotation.y = Math.PI;
+			meshAnim2.scale.set( 2, 2, 2 );
+			window.hittableObjects.push(meshAnim2);
+			var solidObj = {mesh:meshAnim2, x:-2, y:0, size:1};
+			window.solidObjects.push(solidObj);
+			meshAnim2.position.set(solidObj.x,-3,solidObj.y);
+			window.shipGroup.add(meshAnim2);
 		} );
 		loader.load( "pirateShip.js", function( geometry, materials ) {
 			var material = new THREE.MeshFaceMaterial( materials );
@@ -74,7 +155,7 @@ window.gotoFight = function()
 			var meshAnim2 = new THREE.Mesh( geometry, material );
 			meshAnim2.position.set(0,-12,0);
 			meshAnim2.scale.set( 2, 2, 2 );
-			window.scene.add(meshAnim2);
+			window.shipGroup.add(meshAnim2);
 		} );
 		loader.load( "pirateShipHit.js", function( geometry, materials ) {
 			var material = new THREE.MeshFaceMaterial( materials );
@@ -84,40 +165,49 @@ window.gotoFight = function()
 			meshAnim2.scale.set( 2, 2, 2 );
 			meshAnim2.visible = false;
 			window.walkableMeshes = [meshAnim2];
-			window.scene.add(meshAnim2);
+			window.shipGroup.add(meshAnim2);
 		} );
+		window.shipGroup.rotation.z = Math.PI/80;
+		window.animationsToRemove = [];
+		window.shipRock = {time:0,update:function(dt)
+		{
+			this.time += dt;
+			window.shipGroup.rotation.z = Math.sin(this.time/2)*Math.PI/80;
+			window.shipGroup.rotation.x = Math.sin(this.time/3)*Math.PI/80;
+			window.waterTexture.offset.x += .08*dt;
+			window.mousePlane.position.y = -8+Math.sin(this.time/3)*.5;
+		}}
+		window.addAnimation(window.shipRock);
+		window.animationsToRemove.push(window.shipRock);
+		window.scene.add(shipGroup);
 		// pirate move speed
 		window.moveSpeed = 5;
 		window.posRefreshTime = .1;
 		// initialize mouse so it doesn't throw errors before you move it.
 		window.mouseX = 1;
 		window.mouseY = 1;
-		window.centerCamera = {scaleVector:new THREE.Vector3(0,20, 7),update:function(dt)
+		window.startZoom = 5;
+		window.gameStarted = false;
+		window.centerCamera = {scaleVector:new THREE.Vector3(0,17, -15),update:function(dt)
 		{
 			var origin = new THREE.Vector3(0, 0, 0);
-			if (window.pirates.length > 0)
-			{
-				for (var i in window.pirates)
+			if (window.gameStarted)
+				if (window.startZoom > 1)
 				{
-					origin.add(new THREE.Vector3(window.pirates[i].currX, 0, window.pirates[i].currY));
-				}
-				origin.divideScalar(window.pirates.length);
-				var variance = 0;
-				for (var i in window.pirates)
-				{
-					variance += origin.clone().sub(new THREE.Vector3(window.pirates[i].currX, 0, window.pirates[i].currY)).lengthSq();
-				}
-				
-				window.camera.position = window.myPirate.mesh.position.clone().add(this.scaleVector);
-				//window.camera.position = origin.clone().add(this.scaleVector.clone().multiplyScalar(1));//.5+Math.sqrt(variance*.05)));
-				//origin.clone().add(this.scaleVector.clone().multiplyScalar(1));//.5+Math.sqrt(variance*.05)));
-			}
+					this.scaleVector.applyAxisAngle( new THREE.Vector3(0, 1, 0), dt*Math.PI*2/4 );
+					window.startZoom -= 2*dt;
+				}else
+					window.startZoom = 1;
+			window.camera.position = window.myPirate.mesh.position.clone().add(this.scaleVector.clone().multiplyScalar(window.startZoom));
+			camera.lookAt(window.myPirate.mesh.position);
 		}}
 		window.addAnimation(window.centerCamera);
-		window.updateAnimation = {scaleVector:new THREE.Vector3(0,20, 7),keyDown:[],time:0,update:function(dt)
+		window.animationsToRemove.push(window.centerCamera);
+		window.updateAnimation = {keyDown:[],time:0,update:function(dt)
 		{
 			if (!window.myPirate.frozen)
 			{
+				window.gameStarted = true;
 				window.myPirate.mesh.rotation.z = Math.atan2(window.mouseY/window.HEIGHT-.5, window.mouseX/window.WIDTH-.5)-Math.PI/2;
 				if (!this.lastX)
 					this.lastX = window.myPirate.currX;
@@ -174,6 +264,7 @@ window.gotoFight = function()
 			}
 		}};
 		window.addAnimation(window.updateAnimation);
+		window.animationsToRemove.push(window.updateAnimation);
 		$(window).keydown(function(event)
 		{
 			if (!chatBox.find("input").is(":focus"))
@@ -241,8 +332,14 @@ window.gotoFight = function()
 		$("canvas").bind("contextmenu",function(e){
 		  e.preventDefault();
 		});
-		window.mousePlane = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshNormalMaterial());
-		window.mousePlane.position.set(0,-6,0);
+		window.waterTexture = new THREE.ImageUtils.loadTexture("waterTex.png");
+		window.waterTexture.wrapS = window.waterTexture.wrapT = THREE.RepeatWrapping;
+		window.waterTexture.repeat.x = 4;
+		window.waterTexture.repeat.y = 4;
+		var materials = [];
+		materials= (new THREE.MeshBasicMaterial({map:window.waterTexture}));
+		window.mousePlane = new THREE.Mesh(new THREE.PlaneGeometry(160, 160), materials);
+		window.mousePlane.position.set(0,-10,0);
 		window.mousePlane.rotation.x = -Math.PI/2;
 		//window.mousePlane.visible = false;
 		window.scene.add(window.mousePlane);
@@ -305,6 +402,9 @@ window.getHittableObjectByFunct = function(funct)
 	for (var i in window.barrels)
 		if (funct(window.barrels[i]))
 			return window.barrels[i];
+	for (var i in window.solidObjects)
+		if (funct(window.solidObjects[i]))
+			return window.solidObjects[i];
 }
 window.getHit = function(pirate)
 {
@@ -339,14 +439,15 @@ window.makePirateFor = function(id)
 			meshAnim2.scale.set( 1, 1, 1 );
 			meshAnim2.rotation.x = Math.PI/2;
 			meshAnim2.position.set(1,-3,-4);
-			var morphAnimations = {morph:meshAnim2,animations:[],totalFrames:60,speed:.35};
+			var morphAnimations = {morph:meshAnim2,animations:[],totalFrames:80,speed:.29};
+			meshAnim2.duration = morphAnimations.totalFrames*1000;
 			morphAnimations.animations['walking'] = {start:1,end:20};
 			morphAnimations.animations['fighting'] = {start:21,end:45};
 			morphAnimations.animations['blocking'] = {start:46,end:50,dontLoop:true};
 			morphAnimations.animations['standing'] = {start:51,end:60};
 			morphAnimations.currentAnimation = 'standing';
 			morphs.push(morphAnimations);
-			scene.add( meshAnim2 );
+			window.shipGroup.add( meshAnim2 );
 			window.hittableObjects.push(meshAnim2);
 			var pirate = {hp:3,anims:morphAnimations,playerId:id, mesh:meshAnim2, currX:meshAnim2.position.x, currY:meshAnim2.position.z};
 			if (id == window.playerId)
@@ -377,6 +478,13 @@ window.removePirateById = function(id)
 		}
 	}
 }
+actions.push({
+	type:"explodeBarrel",
+	subType:["fightRoom"],
+	funct:function(action){
+		window.barrels[action.barrelNumber].getHit();
+	}
+});
 actions.push({
 	type:"disconnect",
 	subType:["fightRoom"],
@@ -538,8 +646,11 @@ actions.push({
 						if (this.time > 4)
 						{
 							window.gotoGameRoom();
-							window.removeAnimation(window.updateAnimation);
-							window.removeAnimation(window.centerCamera);
+							for (var i in window.animationsToRemove)
+							{
+								window.removeAnimation(window.animationsToRemove[i]);
+							}
+							window.animationsToRemove = [];
 							window.removeAnimation(this);
 						}
 					}
@@ -617,6 +728,13 @@ actions.push({
 									window.doAction({type:'lostALife', playerId:window.playerId}, true);
 								else
 									window.doAction({type:'pushedBack', playerId:window.playerId, direction:this.pirate.mesh.rotation.z+Math.PI/2}, true);
+							}else if (this.pirate.playerId == window.playerId)
+							{
+								for (var i in window.barrels)
+								{
+									if (closestObject == window.barrels[i])
+										window.doAction({type:"explodeBarrel", barrelNumber:parseInt(i)}, true)
+								}
 							}
 						}
 					}else

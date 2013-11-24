@@ -12,6 +12,7 @@ window.actions = [];
 <script src="scripts/gameRoom.js"></script>
 <script src="scripts/fight.js"></script>
 <script src="scripts/tutorials.js"></script>
+<script src="scripts/TextureAnimator.js"></script>
 <body><div id=gameDiv style="position:absolute;width:600;height:400;"></div></body>
 <script>
 $(function()
@@ -121,6 +122,15 @@ $(function()
 				window.removeAnimation(window.animations[i]);
 		}
 	}
+	window.animatedTextures = [];
+	window.addAnimatedTexture = function(ani)
+	{
+		window.animatedTextures.push(ani);
+	}
+	window.removeAnimatedTexture = function(ani)
+	{
+		window.animatedTextures.splice(window.animatedTextures.indexOf(ani), 1);
+	}
 	window.renderFunct = function()
 	{
 		requestAnimationFrame(window.renderFunct);
@@ -128,25 +138,30 @@ $(function()
 		for ( var i = 0; i < morphs.length; i ++ ) {
 			var morph = morphs[i].morph;
 			var currAni = morphs[i].animations[morphs[i].currentAnimation];
-			var currFrame = (morph.time+1000*morphs[i].speed*delta)/1000*morphs[i].totalFrames;
+			var duration = morph.duration;
+			var currFrame = (morph.time+duration*morphs[i].speed*delta)/duration*morphs[i].totalFrames;
 			//console.log('1',currFrame);
 			if (currAni.pose)
 			{
 				//if (Math.abs(currFrame - currAni.frame) > 1)
 				//{
-					morph.time = (currAni.frame)*1000/morphs[i].totalFrames;
-					morph.updateAnimation( 1000*morphs[i].speed*delta );
+					morph.time = (currAni.frame)*duration/morphs[i].totalFrames;
+					morph.updateAnimation( duration*morphs[i].speed*delta );
 				//}
 			}else
 			{
 				if (currFrame <= currAni.start)
-					morph.time = (currAni.start)*1000/morphs[i].totalFrames;
+					morph.time = (currAni.start)*duration/morphs[i].totalFrames;
 				if (currFrame >= currAni.end && !currAni.dontLoop)
-					morph.time -= (currAni.end-currAni.start)*1000/morphs[i].totalFrames;
+					morph.time -= (currAni.end-currAni.start)*duration/morphs[i].totalFrames;
 				if (!currAni.dontLoop || currFrame <= currAni.end)
-					morph.updateAnimation( 1000*morphs[i].speed*delta );
+					morph.updateAnimation( duration*morphs[i].speed*delta );
 			}
 			//console.log('2',currFrame);
+		}
+		for (var i = window.animatedTextures.length-1; i >= 0; --i)
+		{
+			window.animatedTextures[i].update(1000*delta);
 		}
 		for (var i = window.animations.length-1; i >= 0; --i)
 		{
