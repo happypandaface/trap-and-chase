@@ -29,6 +29,7 @@ div.healthBar
 	position:absolute;
 	left:10;
 	top:10;
+	pointer-events:none;
 	white-space:nowrap;
 }
 div.endText

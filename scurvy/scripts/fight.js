@@ -118,28 +118,6 @@ window.gotoFight = function()
 		{
 			if (!window.myPirate.frozen)
 			{
-			/*
-				var elem = window.renderer.domElement, 
-					boundingRect = elem.getBoundingClientRect(),
-					x = (window.mouseX - boundingRect.left) * (elem.width / boundingRect.width),
-					y = (window.mouseY - boundingRect.top) * (elem.height / boundingRect.height);*/
-				/*
-				var vector = new THREE.Vector3(
-					( window.mouseX / WIDTH ) * 2 - 1, 
-					- ( window.mouseY / HEIGHT ) * 2 + 1, 
-					0.5 
-				);
-				//console.log(Math.floor(point.x) + ", " + Math.floor(point.z));
-				projector.unprojectVector( vector, camera );
-				var ray = new THREE.Raycaster( camera.position, vector.sub( camera.position ).normalize() );
-				var intersects = ray.intersectObject( window.mousePlane );
-				if (intersects.length > 0)
-				{
-					var point = intersects[0].point;
-					var diff = window.myPirate.mesh.position.clone().sub(point);
-					window.myPirate.mesh.rotation.z = Math.atan2(diff.z, diff.x)+Math.PI/2;
-				}
-				*/
 				window.myPirate.mesh.rotation.z = Math.atan2(window.mouseY/window.HEIGHT-.5, window.mouseX/window.WIDTH-.5)-Math.PI/2;
 				if (!this.lastX)
 					this.lastX = window.myPirate.currX;
@@ -242,8 +220,9 @@ window.gotoFight = function()
 		});
 		$("canvas").mousemove(function(e)
 		{
-			window.mouseX = e.clientX;
-			window.mouseY = e.clientY;
+			var parentOffset = $(this).parent().offset();
+			window.mouseX = e.clientX-parentOffset.left;
+			window.mouseY = e.clientY-parentOffset.top;
 		});
 		$("canvas").mouseup(function(e)
 		{
@@ -359,8 +338,8 @@ window.makePirateFor = function(id)
 			var meshAnim2 = new THREE.MorphAnimMesh( geometry, material );
 			meshAnim2.scale.set( 1, 1, 1 );
 			meshAnim2.rotation.x = Math.PI/2;
-			meshAnim2.position.set(2,-3,-5);
-			var morphAnimations = {morph:meshAnim2,animations:[],totalFrames:60,speed:.45};
+			meshAnim2.position.set(1,-3,-4);
+			var morphAnimations = {morph:meshAnim2,animations:[],totalFrames:60,speed:.35};
 			morphAnimations.animations['walking'] = {start:1,end:20};
 			morphAnimations.animations['fighting'] = {start:21,end:45};
 			morphAnimations.animations['blocking'] = {start:46,end:50,dontLoop:true};
@@ -640,35 +619,6 @@ actions.push({
 									window.doAction({type:'pushedBack', playerId:window.playerId, direction:this.pirate.mesh.rotation.z+Math.PI/2}, true);
 							}
 						}
-						/*
-						var pLocal = new THREE.Vector3( 0, 1, 0 );
-						var pWorld = pLocal.applyMatrix4( this.pirate.mesh.matrixWorld );
-						var dir = pWorld.sub( this.pirate.mesh.position ).normalize();
-						var ray = new THREE.Raycaster( this.pirate.mesh.position, dir );
-						var intersects = ray.intersectObjects( window.hittableObjects );
-						if (intersects.length > 0)
-						{
-							if (intersects[0].distance < 5)
-							{
-								var objHit = window.getHittableObjectByFunct(function(obj)
-								{
-									if (obj.mesh == intersects[0].object)
-										return true;
-								});
-								if (objHit)
-								{
-									if (this.pirate.playerId != window.playerId &&
-										objHit.playerId == window.playerId)
-									{
-										if (!objHit.blocking)// eventually calculate direction the pirate is facing
-											window.doAction({type:'lostALife', playerId:window.playerId}, true);
-										else
-											window.doAction({type:'pushedBack', playerId:window.playerId, direction:this.pirate.mesh.rotation.z+Math.PI/2}, true);
-									}
-								}
-							}
-						}
-						*/
 					}else
 					if (this.time > 1)
 					{
