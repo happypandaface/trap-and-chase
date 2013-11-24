@@ -48,3 +48,25 @@ div.endText
 	text-align:center;
 	
 }
+div.basicPopup
+{
+	position:absolute;
+	left:50%;
+	top:50%;
+	width:400;
+	margin-left:-200;
+	height:250;
+	margin-top:-125;
+	background-color:#C40020;
+	color:#ffaaaa;
+	font-size:16;
+	vertical-align:middle;
+	text-align:center;
+	
+}
+button.tutorial
+{
+	position:absolute;
+	top:410;
+	left:10;
+}

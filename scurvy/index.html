@@ -11,6 +11,7 @@ window.actions = [];
 <script src="scripts/chat.js"></script>
 <script src="scripts/gameRoom.js"></script>
 <script src="scripts/fight.js"></script>
+<script src="scripts/tutorials.js"></script>
 <body><div id=gameDiv style="position:absolute;width:600;height:400;"></div></body>
 <script>
 $(function()
@@ -243,6 +244,7 @@ $(function()
 			window.gameId = window.playerId;
 			console.log(window.location.href+'#'+window.playerId);
 			openChat();
+			setTutorialLink();
 			window.gotoGameRoom();
 			doAction({type:"joinedGameRoom", playerId:window.playerId}, true);
 			//doAction({type:"makeHand", playerId:window.playerId});
@@ -260,6 +262,7 @@ $(function()
 			//doAction({type:"makeHand", playerId:window.playerId}, true);
 			doAction({type:"joinedGameRoom", playerId:window.playerId}, true);
 			openChat();
+			setTutorialLink();
 		}
 		window.startClient();
 	}
