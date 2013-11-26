@@ -1,7 +1,6 @@
 <link rel="stylesheet" type="text/css" href="style.css">
 <script src="../jquery-1.9.1.min.js"></script>
-<script src=tween.min.js></script>
-<script src=three.min.js></script>
+<script src=three.js></script>
 <script src="/socket.io/socket.io.js"></script>
 <script src="../seedrandom.js"></script>
 <script>
@@ -13,6 +12,7 @@ window.actions = [];
 <script src="scripts/fight.js"></script>
 <script src="scripts/tutorials.js"></script>
 <script src="scripts/shipFight.js"></script>
+<script src="scripts/beachFight.js"></script>
 <script src="scripts/fightActions.js"></script>
 <script src="scripts/TextureAnimator.js"></script>
 <body><div id=gameDiv style="position:absolute;width:600;height:400;"></div></body>
@@ -238,9 +238,10 @@ $(function()
 	{
 		id:"gotoCurrentRoom",
 		roomFunctionName:"gotoGameRoom",
+		fightPlace:"ship",
 		funct:function(data)
 		{
-			doAction({type:this.roomFunctionName, playerId:data.playerId}, true, true);
+			doAction({type:this.roomFunctionName, place:this.fightPlace, playerId:data.playerId}, true, true);
 		}
 	});
 	window.addNewPlayerFunction(

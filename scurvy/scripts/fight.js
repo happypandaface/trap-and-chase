@@ -1,7 +1,7 @@
 window.directionalLight = new THREE.DirectionalLight(0xffffff);
 actions.push({type:'fight',funct:function(action)
 {// starts the fight screen, only one player needs to send this, no confirmation, that's how it works on the high seas
-	window.gotoFight();
+	window.gotoFight(action.place);
 }});
 window.getSortedPlayers = function()
 {// sort the players alphabetically so that everyone has the same list, this is used to position players
@@ -9,24 +9,31 @@ window.getSortedPlayers = function()
 	sortedPlayers.sort(function(a,b){return a.playerId.valueOf()>b.playerId.valueOf()});
 	return sortedPlayers;
 }
+/*
 window.translateGamePosToRealPos = function(x, y, mesh)
-{// because the rocking of the ship, the logical location of the player is different than the graphical position.
+{// because the rocking of the ship, the logical location of the player is different than the graphical position. (NOT TRUE ANYMORE BECAUSE OF 3D GROUPS)
 	if (!mesh)
 		return {x:x, y:mesh.position.y, z:y};
 	else
 		mesh.position.set(x,mesh.position.y,y);
 }
+*/
 window.checkPossibleLocation = function(x, y, pirate)
 {// check if a player can go to this location and if not try and return the closest spot they can go to.
+	var posY = pirate.mesh.position.y;
 	if (!pirate.ignoreWalkingMesh)
 	{
 		var vector = new THREE.Vector3(0, -3, 0).normalize();
-		vector.applyQuaternion(window.shipGroup.quaternion);
-		var ray = new THREE.Raycaster( new THREE.Vector3(x, -3, y), vector );
-		window.shipGroup
+		//vector.applyQuaternion(window.shipGroup.quaternion);
+		var ray = new THREE.Raycaster( new THREE.Vector3(x, pirate.mesh.position.y, y), vector );
+		//window.shipGroup
 		var intersects = ray.intersectObjects( window.walkableMeshes );
 		if (intersects.length == 0)
 			return null;// if it doesn't intersect a walkable mesh, tell them they can't go there
+		else
+		{
+			posY = intersects[0].point.y+3.4;
+		}
 	}
 	for (var i in window.barrels)
 	{
@@ -36,7 +43,7 @@ window.checkPossibleLocation = function(x, y, pirate)
 		{
 			// this means the point is in the barrel, return the nearest point on the barrel's perimeter
 			bar.add(pos.sub(bar).normalize().multiplyScalar(window.barrels[i].size));
-			return {x:bar.x, y:bar.y};
+			return new THREE.Vector3(bar.x, posY, bar.y);
 		}
 	}
 	for (var i in window.solidObjects)
@@ -47,16 +54,40 @@ window.checkPossibleLocation = function(x, y, pirate)
 		{
 			// this means the point is in the barrel, return the nearest point on the barrel's perimeter
 			bar.add(pos.sub(bar).normalize().multiplyScalar(window.solidObjects[i].size));
-			return {x:bar.x, y:bar.y};
+			if (window.solidObjects[i].hitBy)
+			{
+				var hit = window.solidObjects[i].hitBy(pirate);
+				if (hit == "ignore")
+					continue;
+				else if (hit)
+				{
+					if (hit.returnNull)
+						return null;
+					return hit;
+				}else
+					return new THREE.Vector3(bar.x, posY, bar.y);
+			}else
+				return new THREE.Vector3(bar.x, posY, bar.y);
 		}
 	}
-	return {x:x, y:y};
+	return new THREE.Vector3(x, posY, y);
 }
-window.gotoFight = function()
+window.addThingsToLoad = function(thngs)
+{
+	window.thingsToLoad += thngs;
+}
+window.thingsWereLoaded = function(thngs)
+{
+	window.thingsLoaded += thngs;
+	if (window.thingsLoaded == window.thingsToLoad)
+		window.gameStarted = true;
+}
+window.gotoFight = function(place)
 {// this sets up the fight, this needs to be changed so that it can be called multiple times, needs a destructor.
 	if (window.currentRoom != "fightRoom")
 	{
 		window.getNPF("gotoCurrentRoom").roomFunctionName = "fight";
+		window.getNPF("gotoCurrentRoom").fightPlace = place;
 		window.currentRoom = "fightRoom";
 		window.gameElement.children('#ui').empty();
 		window.destroyScene();
@@ -66,10 +97,23 @@ window.gotoFight = function()
 		window.parentGroup = null;
 		window.solidObjects = [];
 		window.barrels = [];
+		window.gameStarted = false;
 		
-		window.doShipFight();
-		
-		window.centerCamera = {scaleVector:new THREE.Vector3(0,17, -15),update:function(dt)
+		window.traps = [];
+		// these two variables allow the level js file to setup things to load like models and textures.
+		window.thingsLoaded = 0;
+		window.thingsToLoad = 0;
+		window.scaleVector = null;// this allows specific locations to have different camera angles
+		if (place == "ship")
+			window.doShipFight();
+		else if (place == "beach")
+			window.doBeachFight();
+		if (!window.scaleVector)
+		{
+			window.scaleVector = new THREE.Vector3(0,17, -15);
+		}
+		window.thingsWereLoaded(0);
+		window.centerCamera = {scaleVector:window.scaleVector,update:function(dt)
 		{
 			var origin = new THREE.Vector3(0, 0, 0);
 			if (window.gameStarted)
@@ -94,43 +138,36 @@ window.gotoFight = function()
 		window.mouseX = 1;
 		window.mouseY = 1;
 		window.startZoom = 5;
-		window.gameStarted = false;
 		window.updateAnimation = {keyDown:[],time:0,update:function(dt)
 		{
-			if (!window.myPirate.frozen)
+			if (!window.myPirate.frozen && window.gameStarted)
 			{
-				window.gameStarted = true;
-				window.myPirate.mesh.rotation.z = Math.atan2(window.mouseY/window.HEIGHT-.5, window.mouseX/window.WIDTH-.5)-Math.PI/2;
 				if (!this.lastX)
 					this.lastX = window.myPirate.currX;
 				if (!this.lastY)
 					this.lastY = window.myPirate.currY;
-				var nextX = window.myPirate.currX;
-				var nextY = window.myPirate.currY;
 				if (!window.myPirate.inAction && this.keyDown['space'])
-					doAction({type:'pirateJump', playerId:window.playerId}, true);
+				doAction({type:'pirateJump', playerId:window.playerId}, true);
+				var camDir = window.myPirate.mesh.position.clone().sub(window.camera.position);
+				var moveAngle = Math.atan2(camDir.z, camDir.x);
+				window.myPirate.mesh.rotation.z = Math.atan2(window.mouseY/window.HEIGHT-.5, window.mouseX/window.WIDTH-.5)+moveAngle;
+				var nextPos = new THREE.Vector2(0, 0);
 				if (this.keyDown['w'])
-					nextY -= window.moveSpeed*dt*window.myPirate.dampenMovement;
+					window.pushInDir(nextPos, moveAngle, dt*window.myPirate.dampenMovement);
 				if (this.keyDown['a'])
-					nextX -= window.moveSpeed*dt*window.myPirate.dampenMovement;
+					window.pushInDir(nextPos, moveAngle-Math.PI/2, dt*window.myPirate.dampenMovement);
 				if (this.keyDown['s'])
-					nextY += window.moveSpeed*dt*window.myPirate.dampenMovement;
+					window.pushInDir(nextPos, moveAngle+Math.PI, dt*window.myPirate.dampenMovement);
 				if (this.keyDown['d'])
-					nextX += window.moveSpeed*dt*window.myPirate.dampenMovement;
+					window.pushInDir(nextPos, moveAngle+Math.PI/2, dt*window.myPirate.dampenMovement);
 				if (!window.myPirate.inAction)
 				{
-					if (nextX != window.myPirate.currX || nextY != window.myPirate.currY)
+					if (nextPos.length() != 0)
 						window.switchAnimation(window.myPirate.anims, 'walking');
 					else
 						window.switchAnimation(window.myPirate.anims, 'standing');
 				}
-				var nextPos = window.checkPossibleLocation(nextX, nextY, window.myPirate);
-				if (nextPos != null)
-				{
-					window.myPirate.currX = nextPos.x;
-					window.myPirate.currY = nextPos.y;
-				}
-				window.translateGamePosToRealPos(window.myPirate.currX, window.myPirate.currY, window.myPirate.mesh);
+				window.goDirection(nextPos, window.myPirate, 1);
 				if (window.myPirate.doAttack)
 				{
 					window.myPirate.doAttack = false;
@@ -151,7 +188,7 @@ window.gotoFight = function()
 						this.lastX = window.myPirate.currX;
 						this.lastY = window.myPirate.currY;
 						this.lastRotation = window.myPirate.mesh.rotation.z;
-						window.doAction({type:'updatePirate', playerId:window.playerId, direction:this.lastRotation, x:window.myPirate.currX, y:window.myPirate.currY}, true, true);
+						window.doAction({type:'updatePirate', playerId:window.playerId, direction:this.lastRotation, x:window.myPirate.currX, y:window.myPirate.mesh.position.y, z:window.myPirate.currY}, true, true);
 					}
 				}else
 					this.time += dt;
@@ -210,6 +247,22 @@ window.gotoFight = function()
 		});
 		window.endingGame = false;
 	}
+}
+window.pushInDir = function(next, angle, amount)
+{
+	next.x += window.moveSpeed*amount*Math.cos(angle);
+	next.y += window.moveSpeed*amount*Math.sin(angle);
+}
+window.goDirection = function(dir, pirate, amount)
+{
+	var nextPos = window.checkPossibleLocation(pirate.mesh.position.x+dir.x*amount, pirate.mesh.position.z+dir.y*amount, pirate);
+	if (nextPos != null)
+	{
+		pirate.currX = nextPos.x;
+		pirate.currY = nextPos.z;
+		pirate.mesh.position = nextPos;
+	}
+	//window.translateGamePosToRealPos(pirate.currX, pirate.currY, pirate.mesh);
 }
 window.remakeHealthBars = function()
 {
@@ -271,6 +324,14 @@ window.getHittableObjectByFunct = function(funct)
 		if (funct(window.solidObjects[i]))
 			return window.solidObjects[i];
 }
+window.getTrapById = function(id)
+{
+	for (var i in window.traps)
+	{
+		if (window.traps[i].id == id)
+			return window.traps[i];
+	}
+}
 window.getHit = function(pirate)
 {
 	pirate.hp--;
@@ -288,6 +349,8 @@ window.makePirateFor = function(id)
 		materials[0].morphTargets = true;
 		materials[1].morphTargets = true;
 		materials[2].morphTargets = true;
+		materials[3].morphTargets = true;
+		materials[4].morphTargets = true;
 		var material = new THREE.MeshFaceMaterial( materials );
 		window.getSortedPlayers();
 		var pirateMade = false;

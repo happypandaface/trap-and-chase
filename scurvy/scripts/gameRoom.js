@@ -2,8 +2,10 @@ window.players = [];
 window.gameRoom = $("<div class=dialogue id=gameRoom><div id=link></div></div>");
 var linkBox = $('<div>Game Link:<input></input><div>');
 window.gameRoom.children('#link').append(linkBox);
-var fightButton = $('<button class="pirate fightButton">Everyone fight!</button>');
+var fightButton = $('<button id=mutiny class="pirate fightButton">Everyone fight!</button>');
+var fightButtonBeach = $('<button id=beachFight class="pirate fightButton">Raid a village!</button>');
 window.gameRoom.append(fightButton);
+window.gameRoom.append(fightButtonBeach);
 window.gotoGameRoom = function()
 {
 	if (window.currentRoom != "gameRoom")
@@ -25,12 +27,21 @@ window.gotoGameRoom = function()
 		linkBox.children('input').mouseup(function(e) {
 			e.preventDefault();
 		});
-		var fightButton = window.gameRoom.children('.fightButton');
+		var fightButton = window.gameRoom.children('#mutiny');
 		fightButton.css('position', 'absolute');
 		fightButton.css('bottom', '0px');
+		fightButton.css('left', '0px');
 		fightButton.mouseup(function()
 		{
-			window.doAction({type:'fight', from:window.playerId}, true);
+			window.doAction({type:'fight', place:"ship", from:window.playerId}, true);
+		});
+		var fightButtonBeach = window.gameRoom.children('#beachFight');
+		fightButtonBeach.css('position', 'absolute');
+		fightButtonBeach.css('bottom', '0px');
+		fightButtonBeach.css('right', '0px');
+		fightButtonBeach.mouseup(function()
+		{
+			window.doAction({type:'fight', place:"beach", from:window.playerId}, true);
 		});
 		linkBox.children('input').attr('value',window.location.href.replace('#','')+'#'+window.gameId);
 		window.gameElement.children('#ui').append(window.gameRoom);

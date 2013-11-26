@@ -1,4 +1,27 @@
-
+actions.push({
+	type:"bearTrap",
+	subType:["fightRoom"],
+	funct:function(action){
+		var trap = window.getTrapById(action.trapId);
+		trap.sprung = true;
+		window.switchAnimation(trap.ani, 'spring');
+		var pirate = window.getPirateByPlayerId(action.playerId);
+		pirate.dampenMovement = 0;
+		pirate.mesh.position.x = trap.mesh.position.x;
+		pirate.currX = trap.mesh.position.x;
+		pirate.mesh.position.z = trap.mesh.position.z;
+		pirate.currY = trap.mesh.position.z;
+		window.addAnimation({time:0,pirate:pirate,update:function(dt)
+		{
+			this.time += dt;
+			if (this.time > 2)
+			{
+				this.pirate.dampenMovement = 1;
+				window.removeAnimation(this);
+			}
+		}});
+	}
+});
 actions.push({
 	type:"pirateThrown",
 	subType:["fightRoom"],
@@ -19,13 +42,7 @@ actions.push({
 		window.addAnimation({type:"pirateThrow",time:0,pirate:pirate,mag:mag+.5,dir:action.dir,update:function(dt){
 			window.switchAnimation(this.pirate.anims, 'jumping');
 			this.pirate.mesh.position.y = -3 + this.mag*6*Math.sin(this.time*Math.PI/this.mag);
-			var nextPos = window.checkPossibleLocation(window.myPirate.currX+this.dir.x*this.mag*10*dt, window.myPirate.currY+this.dir.y*this.mag*10*dt, window.myPirate);
-			if (nextPos != null)
-			{
-				window.myPirate.currX = nextPos.x;
-				window.myPirate.currY = nextPos.y;
-			}
-			window.translateGamePosToRealPos(window.myPirate.currX, window.myPirate.currY, window.myPirate.mesh);
+			window.goDirection(this.dir, this.pirate, this.mag*10*dt);
 			this.time += dt;
 			if (this.time > this.mag)
 			{
@@ -49,13 +66,13 @@ actions.push({
 		var pirate = window.getPirateByPlayerId(action.playerId);
 		pirate.inAction = true;
 		pirate.ignoreWalkingMesh = true;
-		window.addAnimation({type:"pirateJump",time:0,pirate:pirate,update:function(dt){
+		window.addAnimation({type:"pirateJump",startY:pirate.mesh.position.y,time:0,pirate:pirate,update:function(dt){
 			window.switchAnimation(this.pirate.anims, 'jumping');
-			this.pirate.mesh.position.y = -3 + 4*Math.sin(this.time*Math.PI/.7);
+			this.pirate.mesh.position.y = this.startY + 4*Math.sin(this.time*Math.PI/.7);
 			this.time += dt;
 			if (this.time > .7)
 			{
-				this.pirate.mesh.position.y = -3;
+				this.pirate.mesh.position.y = this.startY;
 				this.pirate.ignoreWalkingMesh = false;
 				this.pirate.inAction = false;
 				if (this.pirate.playerId == window.playerId && window.checkPossibleLocation(this.pirate.currX, this.pirate.currY, this.pirate) == null)
@@ -74,9 +91,9 @@ actions.push(
 		pirate.ignoreWalkingMesh = false;
 		pirate.leaveCamera = true;
 		window.switchAnimation(pirate.anims, 'jumping');
-		window.addAnimation({type:"pirateOut",time:0,pirate:pirate,update:function(dt){
+		window.addAnimation({type:"pirateOut",time:0,startY:pirate.mesh.position.y,pirate:pirate,update:function(dt){
 			window.switchAnimation(this.pirate.anims, 'jumping');
-			this.pirate.mesh.position.y = -3 +5*(-(this.time+1)*(this.time+1)+1);
+			this.pirate.mesh.position.y = this.startY +5*(-(this.time+1)*(this.time+1)+1);
 			this.time += dt;
 			if (this.time > .5 && !this.madeSplash)
 			{
@@ -157,12 +174,10 @@ actions.push({
 			type:'pirateMoveAnimation',
 			pirate:pirate,
 			time:0,
-			destX:action.x,
-			destY:action.y,
-			distX:action.x-pirate.currX,
-			distY:action.y-pirate.currY,
+			dest:new THREE.Vector3(action.x, action.y, action.z),
+			dist:new THREE.Vector3(action.x, action.y, action.z).sub(pirate.mesh.position),
 			direction:action.direction,
-			dist:dist,
+			rotDist:dist,
 			speed:speed,
 			special:action.special,
 			update:function(delta)
@@ -171,8 +186,7 @@ actions.push({
 				if (this.time > this.speed)
 				{
 					this.pirate.mesh.rotation.z = this.direction;
-					this.pirate.currX = this.destX;
-					this.pirate.currY = this.destY;
+					this.pirate.mesh.position = this.dest;
 					if (!this.pirate.inAction)
 						this.pirate.anims.currentAnimation = 'standing';
 					window.removeAnimation(this);
@@ -182,11 +196,10 @@ actions.push({
 					{
 						if (!this.pirate.inAction)
 							this.pirate.anims.currentAnimation = 'walking';
-						this.pirate.currX += this.distX*(delta/this.speed);
-						this.pirate.currY += this.distY*(delta/this.speed);
+						this.pirate.mesh.position.add(this.dist.clone().multiplyScalar(delta/this.speed));
 					}
-					this.pirate.mesh.rotation.z += this.dist*(delta/this.speed);
-					window.translateGamePosToRealPos(this.pirate.currX, this.pirate.currY, this.pirate.mesh);
+					this.pirate.mesh.rotation.z += this.rotDist*(delta/this.speed);
+					//window.translateGamePosToRealPos(this.pirate.currX, this.pirate.currY, this.pirate.mesh);
 				}
 			}
 		});
@@ -211,24 +224,17 @@ actions.push({
 			}
 		});
 		var strength = 7;
+		var dir = new THREE.Vector2(Math.cos(action.direction), Math.sin(action.direction));
 		window.addAnimation({
 			type:'piratePushedBack',
 			pirate:pirate,
 			time:0,
-			direction:action.direction,
+			direction:dir,
 			strength:strength,
 			update:function(delta)
 			{
 				this.time += delta;
-				var nextX = this.pirate.currX + Math.cos(this.direction)*this.strength*delta;
-				var nextY = this.pirate.currY + Math.sin(this.direction)*this.strength*delta;
-				var nextPos = window.checkPossibleLocation(nextX, nextY);
-				if (nextPos != null)
-				{
-					this.pirate.currX = nextPos.x;
-					this.pirate.currY = nextPos.y;
-				}
-				window.translateGamePosToRealPos(this.pirate.currX, this.pirate.currY, this.pirate.mesh);
+				window.goDirection(this.direction, this.pirate, this.strength*delta);
 				if (this.time > .8)
 				{
 					this.pirate.blocking = false;
@@ -356,8 +362,10 @@ actions.push({
 							if (closestObject.playerId == window.playerId)
 							{
 								if (!closestObject.blocking)// eventually calculate direction the pirate is facing
+								{
+									window.doAction({type:'pushedBack', playerId:window.playerId, direction:this.pirate.mesh.rotation.z+Math.PI/2}, true);
 									window.doAction({type:'lostALife', playerId:window.playerId}, true);
-								else
+								}else
 									window.doAction({type:'pushedBack', playerId:window.playerId, direction:this.pirate.mesh.rotation.z+Math.PI/2}, true);
 							}else if (this.pirate.playerId == window.playerId)
 							{
