@@ -188,7 +188,7 @@ actions.push({
 					this.pirate.mesh.rotation.z = this.direction;
 					this.pirate.mesh.position = this.dest;
 					if (!this.pirate.inAction)
-						this.pirate.anims.currentAnimation = 'standing';
+						window.switchAnimation(this.pirate.anims, 'standing');
 					window.removeAnimation(this);
 				}else
 				{
@@ -237,10 +237,13 @@ actions.push({
 				window.goDirection(this.direction, this.pirate, this.strength*delta);
 				if (this.time > .8)
 				{
-					this.pirate.blocking = false;
-					this.pirate.inAction = false;
-					this.pirate.anims.currentAnimation = 'standing';
-					this.pirate.frozen = false;
+					if (!this.pirate.dead)
+					{
+						this.pirate.blocking = false;
+						this.pirate.inAction = false;
+						window.switchAnimation(this.pirate.anims, 'standing');
+						this.pirate.frozen = false;
+					}
 					window.removeAnimation(this);
 				}
 			}
@@ -251,7 +254,9 @@ actions.push({
 	type:'pirateDead',
 	funct:function(action){
 		var pirate = window.getPirateByPlayerId(action.playerId);
+		window.switchAnimation(pirate.anims, 'standing');
 		pirate.dead = true;
+		pirate.frozen = true;
 		if (!action.ownAnimation)
 			pirate.mesh.rotation.set(0, 0, 0);
 		// remove other pirate actions for the same pirate
@@ -380,7 +385,7 @@ actions.push({
 					if (this.time > 1)
 					{
 						this.pirate.inAction = false;
-						this.pirate.anims.currentAnimation = 'standing';
+						window.switchAnimation(this.pirate.anims, 'standing');
 						window.removeAnimation(this);
 					}
 				}else
@@ -395,7 +400,7 @@ actions.push({
 					{
 						this.pirate.blocking = false;
 						this.pirate.inAction = false;
-						this.pirate.anims.currentAnimation = 'standing';
+						window.switchAnimation(this.pirate.anims, 'standing');
 						window.removeAnimation(this);
 					}
 				}
