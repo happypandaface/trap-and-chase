@@ -68,6 +68,10 @@ Q.scene("level1",function(stage) {
   {
 	stage.remove(player);
   });
+  Q.el.addEventListener("touchStart", function(e)
+  {
+	stage.remove(player);
+  });
 });
 
 Q.scene('endGame',function(stage) {
