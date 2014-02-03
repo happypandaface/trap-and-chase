@@ -6,6 +6,9 @@ actions.push({
 		trap.sprung = true;
 		window.switchAnimation(trap.ani, 'spring');
 		var pirate = window.getPirateByPlayerId(action.playerId);
+		console.log(action.playerId);
+		if (action.isEnemy)
+			pirate = window.getEnemy(action.playerId);
 		pirate.dampenMovement = 0;
 		pirate.mesh.position.x = trap.mesh.position.x;
 		pirate.currX = trap.mesh.position.x;

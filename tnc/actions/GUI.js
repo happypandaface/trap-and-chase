@@ -1,4 +1,3 @@
-
 window.drawLoop = function()
 {
 	window.currentTimeout = setTimeout(window.drawLoop, window.fps);

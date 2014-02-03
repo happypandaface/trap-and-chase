@@ -96,6 +96,7 @@ window.doBeachFight = function()
 	loader.load( "beach.js", function( geometry, materials, json ) {
 		var treeReg = new RegExp("tree");
 		var bearTrapReg = new RegExp("bearTrap");
+		var banditReg = new RegExp("bandit");
 		for (var i = 0; i < json.bones.length; i++)
 		{
 			console.log(json.bones[i].name);
@@ -113,6 +114,29 @@ window.doBeachFight = function()
 					window.shipGroup.add(meshAnim2);
 					window.thingsWereLoaded(1);
 				}}(posVec));
+			}else
+			if (banditReg.test(json.bones[i].name))
+			{
+				window.addThingsToLoad(1);
+				var pos = json.bones[i].pos;
+				var posVec = new THREE.Vector3(pos[0], pos[1]-2, pos[2]);
+				loader.load( "bandit.js", function(posVec, id)
+				{return function( geometry, materials ) {
+					geometry.computeMorphNormals();
+					materials[0].morphTargets = true;
+					materials[1].morphTargets = true;
+					materials[2].morphTargets = true;
+					var material = new THREE.MeshFaceMaterial( materials );
+					var meshAnim2 = new THREE.MorphAnimMesh( geometry, material );
+					meshAnim2.position = posVec;
+					meshAnim2.rotation.y = -Math.PI/2;
+					meshAnim2.scale.set( .5, .5, .5 );
+					var bandit = window.EnemyFactory.makeBandit(meshAnim2, id);
+					morphs.push(bandit.morphAnimations);
+					window.addEnemy(bandit);
+					window.shipGroup.add(meshAnim2);
+					window.thingsWereLoaded(1);
+				}}(posVec, json.bones[i].name));
 			}else
 			if (bearTrapReg.test(json.bones[i].name))
 			{
@@ -141,7 +165,10 @@ window.doBeachFight = function()
 						var trap = window.getTrapById(this.id);
 						if (!trap.sprung)
 						{
-							doAction({type:"bearTrap", trapId:this.id, playerId:pirate.playerId}, true);
+							if (pirate.isEnemy)
+								doAction({type:"bearTrap", isEnemy:true, trapId:this.id, playerId:pirate.id}, true);
+							else
+								doAction({type:"bearTrap", trapId:this.id, playerId:pirate.playerId}, true);
 							return {returnNull:true};
 						}else
 							return "ignore";

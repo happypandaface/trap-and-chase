@@ -96,6 +96,7 @@ window.gotoFight = function(place)
 		window.pirates = [];
 		window.parentGroup = null;
 		window.solidObjects = [];
+		window.enemies = [];
 		window.barrels = [];
 		window.gameStarted = false;
 		
@@ -168,6 +169,7 @@ window.gotoFight = function(place)
 						window.switchAnimation(window.myPirate.anims, 'standing');
 				}
 				window.goDirection(nextPos, window.myPirate, 1);
+				window.alertEnemies(window.myPirate);
 				if (window.myPirate.doAttack)
 				{
 					window.myPirate.doAttack = false;
@@ -252,6 +254,33 @@ window.pushInDir = function(next, angle, amount)
 {
 	next.x += window.moveSpeed*amount*Math.cos(angle);
 	next.y += window.moveSpeed*amount*Math.sin(angle);
+}
+window.addEnemy = function(enemy)
+{
+	window.enemies.push(enemy);
+}
+window.getEnemy = function(id)
+{
+	for (var i in window.enemies)
+	{
+		if (window.enemies[i].id == id)
+		{
+			return window.enemies[i];
+		}
+	}
+}
+window.alertEnemies = function(pirate)
+{
+	for (var i in window.enemies)
+	{
+		var enemy = window.enemies[i];
+		var vec = pirate.mesh.position.clone().sub(enemy.mesh.position);
+		var dist = vec.length();
+		if (dist < enemy.aggroRange)
+		{
+			enemy.aggro(pirate);
+		}
+	}
 }
 window.goDirection = function(dir, pirate, amount)
 {

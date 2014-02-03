@@ -21,7 +21,7 @@ makeid = function()
     var text = "";
     var possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
-    for( var i=0; i < 5; i++ )
+    for(var i=0; i < 5; i++)
         text += possible.charAt(Math.floor(Math.random() * possible.length));
 
     return text;
@@ -64,6 +64,11 @@ io.sockets.on('connection', function (socket) {
 			if (sockets[i] != socket)
 				if (sockets[i].gameId == socket.gameId)
 					sockets[i].emit('disconnect', {socketId:socket.socketId});
+		}
+		for (var i in sockets)
+		{
+			if (sockets[i] == socket)
+				sockets.splice(i, 1);
 		}
 	});
 });
