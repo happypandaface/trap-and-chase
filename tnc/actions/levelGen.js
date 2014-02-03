@@ -191,16 +191,16 @@ window.makeLevel = function(data)
 	if (data.client)
 		guyData.sendsData = true;
 	window.guy = window.spawnGuy(guyData);
-	var table = window.spawnTable(window.spawnRandom(endRoom));
-	window.box = table;
-	var floorbutton = window.spawnRandom(endRoom);
-	while (	floorbutton.x == table.x &&
-			floorbutton.y == table.y)
+	// var table = window.spawnTable(window.spawnRandom(endRoom));
+	// window.box = table;
+	for (var i=0; i<rooms.length; i++)
 	{
-		floorbutton = window.spawnRandom(endRoom);
+		var floorbutton = window.spawnRandom(rooms[i]);
+
+		// floorbutton = window.spawnRandom(endRoom);
+		window.spawnFloorButton(floorbutton);			
 	}
 	window.trapper = window.makeTrapper();
-	window.spawnFloorButton(floorbutton);
 	window.makePaths(rooms);
 }
 window.spawnRandom = function(room)
