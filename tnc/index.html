@@ -1,0 +1,164 @@
+<style>
+body
+{
+	margin: 0;
+}
+div#gui
+{
+	position: relative;
+	background-color:#000000;
+	height:340;
+	width:700;
+	text-align: center;
+}
+div.top
+{
+	color:#aa0000;
+	position: relative;
+	background-color:#000000;
+	height:40;
+	top: 0;
+}
+div.server
+{
+	color:#aa0000;
+	background-color:#0099ff;
+	font-weight:bold;
+	font-family:"courier";
+	position: absolute;
+	left:0;
+	bottom:0;
+	-moz-user-select: none; 
+	-khtml-user-select: none; 
+	-webkit-user-select: none; 
+	-o-user-select: none;
+	cursor:pointer;
+}
+div.tutorial
+{
+	color:#0099ff;
+	background-color:#aa0000;
+	font-weight:bold;
+	font-family:"courier";
+	position: absolute;
+	top:0;
+	left:0;
+	-moz-user-select: none; 
+	-khtml-user-select: none; 
+	-webkit-user-select: none; 
+	-o-user-select: none;
+	cursor:pointer;
+}
+div.weapons
+{
+	font-weight:bold;
+	font-family:"courier";
+	position: absolute;
+	top:45%;
+	right:0;
+	-moz-user-select: none; 
+	-khtml-user-select: none; 
+	-webkit-user-select: none; 
+	-o-user-select: none;
+	cursor:default;
+}
+div.popup
+{
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	margin-top: -50px;
+	margin-left: -100px;
+	height:100;
+	width:200;
+	background-color:#ff8888;
+}
+div.bigText
+{
+	position: absolute;
+	text-align: center;
+	bottom:0;
+	left:50%;
+	font-family:"courier";
+	font-weight:bold;
+	font-size:50;
+}
+div.popupBackground
+{
+	position: absolute;
+	top: 0;
+	left: 0;
+	height:340;
+	width:700;
+	background-color:#996666;
+	opacity:.3;
+}
+</style>
+<body>
+<div id=gui>
+<div class=top>
+</div>
+<canvas id=container height=300 width=500></canvas>
+<div class=server>
+</div>
+<div class=tutorial>
+</div>
+<div class=weapons>
+</div>
+</div>
+</body>
+<script src="../jquery-1.9.1.min.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script src="../seedrandom.js"></script>
+<script src="../seedrandom.js"></script>
+
+<script src="actions/ai.js"></script>
+<script src="actions/checkCollisions.js"></script>
+<script src="actions/GUI.js"></script>
+<script src="actions/keyboard.js"></script>
+<script src="actions/levelGen.js"></script>
+<script src="actions/locations.js"></script>
+<script src="actions/makeGoo.js"></script>
+<script src="actions/mouse.js"></script>
+<script src="actions/networkCommands.js"></script>
+<script src="actions/tellDirections.js"></script>
+
+<script src="objs/bullet.js"></script>
+<script src="objs/enemySpawn.js"></script>
+<script src="objs/floorButton.js"></script>
+<script src="objs/goo.js"></script>
+<script src="objs/guy.js"></script>
+<script src="objs/makeEnemy.js"></script>
+<script src="objs/space.js"></script>
+<script src="objs/table.js"></script>
+<script src="objs/trapper.js"></script>
+<script src="objs/wall.js"></script>
+
+<script>
+$(function()
+{
+	window.levelIterations = 0;
+	window.keysDown = {};
+	window.fps = 40;
+	window.stats = {};
+	window.stats.gameHeight = 300;
+	window.stats.gameWidth = 500;
+	window.stats.guySpeed = 3*window.fps/30;
+	window.stats.gooSpeed = 1*window.fps/30;
+	window.stats.enemySpeed = 1.5*window.fps/30;
+	window.objects = [];
+	window.objectspeed = 6*window.fps/30;
+	window.dir = 0;
+	window.gunCooldownMax = 20;
+	window.gunCooldown = window.gunCooldownMax;
+	
+	window.makeKeyGUI();
+	if (window.location.hash.length > 1)
+	{
+		beClient();
+	}else
+	{
+		normalStart();
+	}
+});
+</script>
