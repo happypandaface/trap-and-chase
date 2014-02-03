@@ -179,6 +179,10 @@ window.spawnGuy = function(data)
 				this.sendData = false;
 				this.sentJump = true;
 			}
+			var butt = getRightHere({x:this.x, y:this.y, type:'button'});
+			if (butt)
+				butt.activate();
+			
 		}
 		if (this.jumpTimer > 0)
 		{
@@ -196,9 +200,7 @@ window.spawnGuy = function(data)
 		{
 			this.jumping = false;
 		}
-		var butt = getRightHere({x:this.x, y:this.y, type:'button'});
-		if (butt)
-			butt.activate();
+
 	}
 	guy.jumped = function()
 	{
