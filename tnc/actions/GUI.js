@@ -1,31 +1,3 @@
-window.drawLoop = function()
-{
-	window.currentTimeout = setTimeout(window.drawLoop, window.fps);
-	for (var i = window.objects.length-1; i >= 0; i--)
-	{
-		if (window.objects[i].go())
-			window.objects.splice(i, 1);
-	}
-	var canvas = document.getElementById("container");
-	var ctx = canvas.getContext("2d");
-	ctx.clearRect(0, 0, window.stats.gameWidth, window.stats.gameHeight);
-	ctx.fillStyle = '#000000';
-	ctx.fillRect(0, 0, window.stats.gameWidth, window.stats.gameHeight);
-	for (var i = 0; i < window.objects.length-1; i++)
-	{//sorting
-		if (window.objects[i].z > window.objects[i+1].z)
-		{
-			var temp = window.objects[i+1];
-			window.objects[i+1] = window.objects[i];
-			window.objects[i] = temp;
-			i--;
-		}
-	}
-	for (var i in window.objects)
-	{
-		window.objects[i].draw(ctx);
-	}
-}
 
 window.makeKeyGUI = function()
 {
@@ -61,6 +33,36 @@ window.makeKeyGUI = function()
 		window.makeWeaponsGUI();
 	}
 }
+
+window.drawLoop = function()
+{
+	window.currentTimeout = setTimeout(window.drawLoop, window.fps);
+	for (var i = window.objects.length-1; i >= 0; i--)
+	{
+		if (window.objects[i].go())
+			window.objects.splice(i, 1);
+	}
+	var canvas = document.getElementById("container");
+	var ctx = canvas.getContext("2d");
+	ctx.clearRect(0, 0, window.stats.gameWidth, window.stats.gameHeight);
+	ctx.fillStyle = '#000000';
+	ctx.fillRect(0, 0, window.stats.gameWidth, window.stats.gameHeight);
+	for (var i = 0; i < window.objects.length-1; i++)
+	{//sorting
+		if (window.objects[i].z > window.objects[i+1].z)
+		{
+			var temp = window.objects[i+1];
+			window.objects[i+1] = window.objects[i];
+			window.objects[i] = temp;
+			i--;
+		}
+	}
+	for (var i in window.objects)
+	{
+		window.objects[i].draw(ctx);
+	}
+}
+
 window.continueChaserInstructions = function()
 {
 	unpopup();
