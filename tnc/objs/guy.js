@@ -179,10 +179,9 @@ window.spawnGuy = function(data)
 				this.sendData = false;
 				this.sentJump = true;
 			}
-			var butt = getRightHere({x:this.x, y:this.y, type:'button'});
+			var butt = getRightHere({x:this.nextX, y:this.nextY, type:'button'});
 			if (butt)
 				butt.activate();
-			
 		}
 		if (this.jumpTimer > 0)
 		{
