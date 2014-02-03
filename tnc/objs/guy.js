@@ -196,6 +196,9 @@ window.spawnGuy = function(data)
 		{
 			this.jumping = false;
 		}
+		var butt = getRightHere({x:this.x, y:this.y, type:'button'});
+		if (butt)
+			butt.activate();
 	}
 	guy.jumped = function()
 	{
