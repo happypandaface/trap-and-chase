@@ -25,6 +25,18 @@ window.getHere = function(data)
 	}
 	return false;
 }
+window.countObjects = function(data)
+{
+	var num = 0;
+	for (var i in window.objects)
+	{
+		if (window.objects[i].checkType(data.type))
+		{
+			num++;
+		}
+	}
+	return num;
+}
 window.getRightHere = function(data)
 {
 	for (var i in window.objects)

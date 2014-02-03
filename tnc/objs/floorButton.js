@@ -15,14 +15,20 @@ window.spawnFloorButton = function(data)
 	button.activate = function(thing)
 	{
 		this.beingRemoved = true;
-		
-		// if (window.inGame && window.isClient)
-		// {
-		// 	window.endGame({result:'win'});
-		// }else if (window.localGame)
-		// {
-		// 	window.endLocalGame({winner:'chaser'});
-		// }
+
+		if (window.countObjects({type:"button"}) == 1) 
+		{
+			if (window.inGame && window.isClient)
+			{
+				window.endGame({result:'win'});
+			}else if (window.localGame)
+			{
+				window.endLocalGame({winner:'chaser'});
+			}
+
+		}
+
+
 	}
 	button.draw = function(ctx)
 	{
