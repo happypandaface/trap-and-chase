@@ -1,0 +1,25 @@
+
+<script src="../jquery-1.9.1.min.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script src="require.js"></script>
+<script>
+$(function()
+{
+	require(['networkCommands.js'], function(network) {
+		window.network = network;
+	});
+	require(['terminal.js'], function(terminal) {
+		terminal.init({color: "#aaa",height:100, width:200});
+		terminal.setTerminal($("body"));
+	});
+	window.popup = function(data)
+	{
+		console.log(data);
+	}
+	window.unpopup = function(data)
+	{
+		console.log("unpopup");
+		console.log(data);
+	}
+});
+</script>
