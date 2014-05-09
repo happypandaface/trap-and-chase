@@ -42,14 +42,36 @@ io.sockets.on('connection', function (socket) {
 	socket.on('gameConnect',function(data) {
 		if (data.id)
 			socket.gameId = data.id;
+		data.playerId = socket.socketId;
 		for (var i in sockets)
 		{
 			if (sockets[i] != socket)
-				if (sockets[i].gameId == socket.gameId)
+				if (sockets[i].socketId == socket.gameId)
 					sockets[i].emit('friendConnected', data);
 		}
 	});
+	socket.on('nameGame',function(data) {
+		if (data.gameName)
+			socket.gameName = data.gameName;
+	});
+	socket.on('getGames',function(data) {
+		rtnData = {games:[]};
+		if (data.gameName)
+		{
+			for (var i in sockets)
+			{
+				if (sockets[i] != socket)
+					if (sockets[i].gameName == data.gameName)
+						rtnData.games.push(sockets[i].gameId);
+			}
+		}else
+		{
+			rtnData.errmsg = "no game name specified";
+		}
+		socket.emit('gotGames', rtnData);
+	});
 	socket.on('update',function(data) {
+		data.playerId = socket.socketId;
 		for (var i in sockets)
 		{
 			if (sockets[i] != socket)
