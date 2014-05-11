@@ -2,11 +2,23 @@ function switchMenu(id)
 {
 	document.getElementById("loginInterface").style.display = 'none';
 	document.getElementById("startInterface").style.display = 'none';
+	document.getElementById("startGameInterface").style.display = 'none';
 	document.getElementById("inRoomInterface").style.display = 'none';
 	document.getElementById("chatInterface").style.display = 'none';
+	document.getElementById("gameInterface").style.display = 'none';
+	
+	
 	document.getElementById(id).style.display = 'inline';
 	if (id == "inRoomInterface")
+	{
 		document.getElementById("chatInterface").style.display = 'inline';
+		if (isHost())
+			document.getElementById("startGameInterface").style.display = 'inline';
+	}
+}
+function isHost()
+{
+	return window.gameObj.player.id == window.gameObj.gameId;
 }
 function endGame(msg)
 {
@@ -14,9 +26,24 @@ function endGame(msg)
 	clearPlayers();
 	document.getElementById("msg").innerHTML = "Game was ended!";
 }
+function getName(plr)
+{
+	return plr.name?plr.name:plr.playerId;
+}
 function addChat(plr, msg)
 {
-	document.getElementById("chatBox").value += "["+plr.playerId+"]: "+msg+"\n";
+	var chat = document.getElementById("chatBox");
+	chat.value += "["+getName(plr)+"]: "+msg+"\n";
+	chat.scrollTop = chat.scrollHeight;
+}
+function getNetPlayers()
+{
+	var plrs = [];
+	for (var i in window.gameObj.players)
+	{
+		plrs.push({playerId:window.gameObj.players[i].playerId, name:window.gameObj.players[i].name});
+	}
+	return plrs
 }
 function clearPlayers()
 {
@@ -60,9 +87,9 @@ function addPlayer(plr)
 		document.getElementById("numPlayers").innerHTML = ""+window.gameObj.players.length;
 	}
 }
-function loaded()
+function init()
 {
-	window.gameObj = {players:[],games:[]};
+	window.gameObj = {players:[],games:[],seedSize:Math.pow(10, 8)};
 	connect();
 	window.gameObj.network.setListener('started', function(e)
 	{
@@ -107,6 +134,11 @@ function loaded()
 		{
 			addChat(e, e.msg);
 		}
+		if (e.action == 'startGame')
+		{
+			switchMenu("gameInterface");
+			startGame(e.seed);
+		}
 	});
 	window.gameObj.network.setListener('friendConnected', function(e)
 	{
@@ -121,7 +153,7 @@ function loaded()
 		}else
 		{
 			removePlayer(e.socketId);
-			window.gameObj.network.send('update', {action:'setPlayers', players:window.gameObj.players});
+			window.gameObj.network.send('update', {action:'setPlayers', players:getNetPlayers()});
 		}
 	});
 	document.getElementById("loginName").addEventListener('keypress', function(e)
@@ -148,9 +180,17 @@ function loaded()
 		addChat(window.gameObj.player, msg);
 		window.gameObj.network.send('update', {action:'chat', msg:msg});
 	});
+	document.getElementById("startGame").addEventListener('click', function(e)
+	{
+		switchMenu("gameInterface");
+		var seed = (Math.floor(Math.random()*window.gameObj.seedSize)%window.gameObj.seedSize).toString(16);
+		startGame(seed);
+		window.gameObj.network.send('update', {action:'startGame', seed:seed});
+	});
 	document.getElementById("makeGame").addEventListener('click', function(e)
 	{
 		switchMenu('inRoomInterface');
+		window.gameObj.gameId = window.gameObj.player.id;
 		addPlayer(window.gameObj.player);
 		window.gameObj.network.send('nameGame', {gameName:'clickUponDots'});
 		document.getElementById("msg").innerHTML = "Youre the host!";
@@ -169,5 +209,6 @@ function loaded()
 		switchMenu('inRoomInterface');
 		document.getElementById("msg").innerHTML = "Joined game!";
 	});
+	initGame();
 }
-window.onload = loaded;
+window.onload = init;

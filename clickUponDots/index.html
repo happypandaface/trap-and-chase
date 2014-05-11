@@ -16,23 +16,27 @@ select
 <div id=startInterface class=notLoaded>
 <button id=makeGame>Make a game!</button>
 <button id=refreshGames>Refresh games!</button><br/>
-Games:
-<select id=gamesList>
-
-</select>
+Games:<select id=gamesList></select>
 <button id=joinGame>Join game!</button><br/>
 </div>
 <div id=inRoomInterface class=notLoaded>
-Players (<span id=numPlayers>0</span>):
-<select id=playerList>
-
-</select>
+Players (<span id=numPlayers>0</span>):<select id=playerList></select>
 </div><br/>
 <div id=chatInterface class=notLoaded>
 <textarea id=chatBox rows=10 col=10 readonly ></textarea><br/>
 <input id=chatText name=chat placeholder="type a message here" ></input><input type=submit id=chatSend ></input><br/>
 </div>
+<div id=startGameInterface class=notLoaded>
+<button id=startGame>Start the game!</button>
+</div>
+<div id=gameInterface class=notLoaded>
+<canvas id=container></canvas>
+</div>
 </body>
 <script src="/socket.io/socket.io.js" ></script>
+<script src="../seedrandom.js" ></script>
 <script src="basicNetworking.js"></script>
+<script src="pos.js"></script>
+<script src="game.js"></script>
+
 <script src="main.js"></script>
