@@ -43,12 +43,17 @@ io.sockets.on('connection', function (socket) {
 		if (data.id)
 			socket.gameId = data.id;
 		data.playerId = socket.socketId;
+		data.name = socket.playerName;
 		for (var i in sockets)
 		{
 			if (sockets[i] != socket)
 				if (sockets[i].socketId == socket.gameId)
 					sockets[i].emit('friendConnected', data);
 		}
+	});
+	socket.on('setName',function(data) {
+		if (data.name) // && TODO: check for duplicates)
+			socket.playerName = data.name;
 	});
 	socket.on('nameGame',function(data) {
 		if (data.gameName)
@@ -62,7 +67,7 @@ io.sockets.on('connection', function (socket) {
 			{
 				if (sockets[i] != socket)
 					if (sockets[i].gameName == data.gameName)
-						rtnData.games.push(sockets[i].gameId);
+						rtnData.games.push({id:sockets[i].gameId, name:sockets[i].playerName});
 			}
 		}else
 		{
@@ -72,6 +77,7 @@ io.sockets.on('connection', function (socket) {
 	});
 	socket.on('update',function(data) {
 		data.playerId = socket.socketId;
+		data.name = socket.playerName;
 		for (var i in sockets)
 		{
 			if (sockets[i] != socket)
